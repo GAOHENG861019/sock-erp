@@ -2217,3 +2217,28 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
 .icon-btn.danger:hover { border-color: #e5484d; color: #e5484d; }
 
+
+
+/* ===== 会员管理 ===== */
+.member-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+.stat-card { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 14px; border: 1px solid var(--border); }
+.stat-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: #fff; font-size: 18px; font-weight: 700; flex-shrink: 0; }
+.stat-value { font-size: 22px; font-weight: 700; color: var(--text); }
+.stat-label { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.member-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.search-box { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); min-width: 220px; }
+.search-box input { border: none; background: transparent; outline: none; color: var(--text); font-size: 14px; flex: 1; }
+.level-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.level-filter { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 13px; cursor: pointer; transition: all .15s; }
+.level-filter:hover { border-color: var(--accent); color: var(--text); }
+.level-filter.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.member-table-wrap { overflow-x: auto; }
+.member-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.member-table th { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border); color: var(--text-muted); font-weight: 600; font-size: 13px; white-space: nowrap; }
+.member-table td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+.member-table tr:hover { background: var(--surface); }
+.member-name-cell { font-weight: 600; }
+.member-notes { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+.row-actions { display: flex; gap: 4px; }
+@media (max-width: 768px) { .member-stats { grid-template-columns: 1fr; } }
+
