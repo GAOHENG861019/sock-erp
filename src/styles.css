@@ -2216,6 +2216,12 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; transition: all .15s; }
 .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
 .icon-btn.danger:hover { border-color: #e5484d; color: #e5484d; }
+.category-drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; color: var(--text-muted); cursor: grab; flex-shrink: 0; margin-right: 8px; }
+.category-drag-handle:hover { color: var(--accent); background: var(--surface-2); }
+.category-drag-handle:active { cursor: grabbing; }
+.category-item { cursor: default; transition: opacity .2s, border-color .2s, background .2s; }
+.category-item.category-dragging { opacity: 0.4; }
+.category-item.category-drag-over { border-color: var(--accent); background: rgba(59,130,246,.06); }
 
 
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash, Tag, Archive } from "@phosphor-icons/react";
+import { Plus, Pencil, Trash, Tag, Archive, DotsSixVertical } from "@phosphor-icons/react";
 import { PageHeader, Section, Button, Modal, EntityForm, ConfirmDialog, EmptyState, Badge } from "../components/ui";
 import { ModuleArtwork } from "../components/ModuleArtwork";
 
@@ -49,6 +49,8 @@ export function CategoryPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   useEffect(() => {
     setProductList(readCategories("product"));
@@ -82,14 +84,16 @@ export function CategoryPage() {
     if (editing) {
       const idx = list.findIndex((c) => c.id === editing.id);
       if (idx >= 0) {
-        list[idx] = { ...list[idx], name: String(values.name).trim(), description: String(values.description ?? "").trim(), sortOrder: Number(values.sortOrder) || 0 };
+        list[idx] = { ...list[idx], name: String(values.name).trim(), description: String(values.description ?? "").trim() };
       }
     } else {
+      // 自动分配排序号：当前最大序号 + 1
+      const maxOrder = list.reduce((m, c) => Math.max(m, c.sortOrder || 0), 0);
       list.push({
         id: genId(),
         name: String(values.name).trim(),
         description: String(values.description ?? "").trim(),
-        sortOrder: Number(values.sortOrder) || 0,
+        sortOrder: maxOrder + 1,
         createdAt: new Date().toISOString(),
       });
     }
@@ -100,15 +104,56 @@ export function CategoryPage() {
 
   function confirmDelete() {
     if (!deleteTarget) return;
-    const list = (activeType === "product" ? productList : materialList).filter((c) => c.id !== deleteTarget.id);
+    let list = (activeType === "product" ? productList : materialList).filter((c) => c.id !== deleteTarget.id);
+    // 删除后重新排列序号
+    list = list.map((c, idx) => ({ ...c, sortOrder: idx + 1 }));
     updateList(activeType, list);
     setDeleteTarget(null);
+  }
+
+  function handleDragStart(e: React.DragEvent, id: string) {
+    setDraggedId(id);
+    e.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleDragOver(e: React.DragEvent, id: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverId !== id) setDragOverId(id);
+  }
+
+  function handleDragLeave() {
+    setDragOverId(null);
+  }
+
+  function handleDrop(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    if (!draggedId || draggedId === targetId) {
+      setDraggedId(null);
+      setDragOverId(null);
+      return;
+    }
+    const list = [...sortedList];
+    const fromIdx = list.findIndex((c) => c.id === draggedId);
+    const toIdx = list.findIndex((c) => c.id === targetId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = list.splice(fromIdx, 1);
+    list.splice(toIdx, 0, moved);
+    // 重新排列序号
+    const renumbered = list.map((c, idx) => ({ ...c, sortOrder: idx + 1 }));
+    updateList(activeType, renumbered);
+    setDraggedId(null);
+    setDragOverId(null);
+  }
+
+  function handleDragEnd() {
+    setDraggedId(null);
+    setDragOverId(null);
   }
 
   const fields = [
     { name: "name", label: "分类名称", type: "text" as const, required: true, placeholder: "如：棉袜 / 纱线" },
     { name: "description", label: "分类说明", type: "textarea" as const, placeholder: "可选，描述该分类的用途" },
-    { name: "sortOrder", label: "排序序号", type: "number" as const, placeholder: "数字越小越靠前", step: "1" },
   ];
 
   return (
@@ -117,7 +162,7 @@ export function CategoryPage() {
         icon={<ModuleArtwork module="fitness" />}
         eyebrow="基础数据"
         title="分类中心"
-        description="维护商品分类和原材料分类，供商品管理、原材料采购等模块引用。"
+        description="维护商品分类和原材料分类，序号自动排列，支持拖拽排序。"
         actions={
           <Button onClick={openAdd}><Plus size={17} />添加{TYPE_META[activeType].label}</Button>
         }
@@ -139,15 +184,27 @@ export function CategoryPage() {
         ))}
       </div>
 
-      <Section title={TYPE_META[activeType].label} description={`共 ${currentList.length} 个分类`}>
+      <Section title={TYPE_META[activeType].label} description={`共 ${currentList.length} 个分类，拖拽可调整顺序`}>
         {sortedList.length === 0 ? (
           <EmptyState title="暂无分类" description={TYPE_META[activeType].emptyText} />
         ) : (
           <div className="category-list">
             {sortedList.map((cat, idx) => (
-              <div key={cat.id} className="category-item glass-clear">
+              <div
+                key={cat.id}
+                className={`category-item glass-clear ${draggedId === cat.id ? "category-dragging" : ""} ${dragOverId === cat.id && draggedId !== cat.id ? "category-drag-over" : ""}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, cat.id)}
+                onDragOver={(e) => handleDragOver(e, cat.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, cat.id)}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="category-drag-handle" title="拖拽排序">
+                  <DotsSixVertical size={18} />
+                </div>
                 <div className="category-item-main">
-                  <span className="category-sort">{cat.sortOrder > 0 ? cat.sortOrder : idx + 1}</span>
+                  <span className="category-sort">{idx + 1}</span>
                   <div>
                     <div className="category-name">{cat.name}</div>
                     {cat.description ? <div className="category-desc">{cat.description}</div> : null}
@@ -167,11 +224,11 @@ export function CategoryPage() {
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditing(null); }}
         title={editing ? `编辑${TYPE_META[activeType].label}` : `添加${TYPE_META[activeType].label}`}
-        description="分类名称必填，排序序号用于控制显示顺序。"
+        description="分类名称必填，序号自动分配，保存后可拖拽调整顺序。"
       >
         <EntityForm
           fields={fields}
-          initial={editing ? { name: editing.name, description: editing.description, sortOrder: editing.sortOrder } : { sortOrder: 0 }}
+          initial={editing ? { name: editing.name, description: editing.description } : {}}
           submitLabel={editing ? "保存修改" : "添加分类"}
           onSubmit={handleSubmit}
           onCancel={() => { setModalOpen(false); setEditing(null); }}
