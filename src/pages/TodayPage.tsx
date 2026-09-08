@@ -57,9 +57,45 @@ export function TodayPage() {
   const ordered = [...items].sort((a, b) => `${a.plan_date}${a.start_time || "99:99"}`.localeCompare(`${b.plan_date}${b.start_time || "99:99"}`));
   const complete = items.filter((item) => item.status === "done").length;
 
+  // 业务数据总览
+  const readLS = <T,>(key: string, fallback: T): T => {
+    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }
+  };
+  const dingxing = readLS<any[]>("sock-erp-dingxing", []);
+  const finishedQty = dingxing.reduce((s, i) => s + Number(i.quantity || 0), 0);
+  const warehouseTotal = data.consultingProjects.length + data.consultingInteractions.length;
+  const inventory = readLS<any[]>("sock-erp-inventory", []);
+  const inventoryQty = inventory.reduce((s, i) => s + Number(i.quantity || 0), 0);
+  const machineLoss = readLS<any[]>("sock-erp-machine-loss", []);
+  const freight = readLS<any[]>("sock-erp-freight", []);
+  const salary = readLS<any[]>("sock-erp-salary", []);
+  const rawMaterials = readLS<any[]>("sock-erp-raw-materials", []);
+  const monthExpense = [...machineLoss, ...freight, ...salary, ...rawMaterials].reduce((s, i) => s + Number(i.amount || 0), 0);
+  const income = readLS<any[]>("sock-erp-income", []);
+  const monthIncome = income.reduce((s, i) => s + Number(i.amount || 0), 0);
+
+  const overviewCards = [
+    { label: "成品数量", value: `${finishedQty} 公斤`, color: "#3498db", icon: "📦" },
+    { label: "仓库总量", value: `${warehouseTotal} 项`, color: "#2ecc71", icon: "🏭" },
+    { label: "库存余量", value: `${inventoryQty} 件`, color: "#9b59b6", icon: "📊" },
+    { label: "本月支出", value: `¥${monthExpense.toFixed(0)}`, color: "#e74c3c", icon: "💸" },
+    { label: "本月收入", value: `¥${monthIncome.toFixed(0)}`, color: "#f39c12", icon: "💰" },
+  ];
+
   return (
     <div>
       <PageHeader icon={<ModuleArtwork module="today" />} eyebrow="月度执行" title="本月总览" description="只安排本月何时执行什么，业务详情仍留在对应模块。" actions={<Button onClick={() => openForm()}><CalendarPlus size={18} />添加事项</Button>} />
+      <div className="month-overview-grid">
+        {overviewCards.map((card) => (
+          <div key={card.label} className="month-overview-card" style={{ borderLeft: `4px solid ${card.color}` }}>
+            <span className="moc-icon" style={{ background: `${card.color}20`, color: card.color }}>{card.icon}</span>
+            <div>
+              <small>{card.label}</small>
+              <strong style={{ color: card.color }}>{card.value}</strong>
+            </div>
+          </div>
+        ))}
+      </div>
       <div className="plan-toolbar">
         <div className="segmented" role="tablist">{(["today", "week", "history"] as const).map((key) => <button key={key} className={view === key ? "active" : ""} onClick={() => setView(key)}>{key === "today" ? "今日" : key === "week" ? "本周" : "历史"}</button>)}</div>
         <label className="date-control"><span>起始日期</span><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
