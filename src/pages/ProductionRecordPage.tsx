@@ -71,15 +71,15 @@ export function ProductionRecordPage({
   return (
     <div>
       <PageHeader icon={<ModuleArtwork module={module} />} eyebrow={eyebrow} title={title} description={description} />
-      <Section title="录入记录" description="填写姓名、规格、数量和单价，合计自动计算">
+      <Section title="录入记录" description="填写姓名、规格、数量(公斤)和单价(元/公斤)，合计自动计算">
         <div className="production-input-row">
           <input className="prod-input" placeholder="姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <select className="prod-input" value={draft.spec} onChange={(e) => setDraft({ ...draft, spec: e.target.value as "包" | "双" })}>
             <option value="双">双</option>
             <option value="包">包</option>
           </select>
-          <input className="prod-input prod-num" type="number" min="0" placeholder="数量" value={draft.quantity || ""} onChange={(e) => setDraft({ ...draft, quantity: Number(e.target.value) || 0 })} />
-          <input className="prod-input prod-num" type="number" min="0" step="0.01" placeholder="单价" value={draft.unitPrice || ""} onChange={(e) => setDraft({ ...draft, unitPrice: Number(e.target.value) || 0 })} />
+          <input className="prod-input prod-num" type="number" min="0" placeholder="数量(公斤)" value={draft.quantity || ""} onChange={(e) => setDraft({ ...draft, quantity: Number(e.target.value) || 0 })} />
+          <input className="prod-input prod-num" type="number" min="0" step="0.01" placeholder="单价(元/公斤)" value={draft.unitPrice || ""} onChange={(e) => setDraft({ ...draft, unitPrice: Number(e.target.value) || 0 })} />
           <span className="prod-total-inline">¥{(draft.quantity * draft.unitPrice).toFixed(2)}</span>
           <Button onClick={addItem}><Plus size={16} />添加</Button>
         </div>
@@ -92,25 +92,25 @@ export function ProductionRecordPage({
             return (
               <Section key={name} title={`姓名：${name}`} description={`${nameItems.length} 条记录`}>
                 <table className="prod-table">
-                  <thead><tr><th>规格</th><th>数量</th><th>单价</th><th>合计</th><th>操作</th></tr></thead>
+                  <thead><tr><th>规格</th><th>数量(公斤)</th><th>单价(元/公斤)</th><th>合计</th><th>操作</th></tr></thead>
                   <tbody>
                     {nameItems.map((item) => (
                       <tr key={item.id}>
                         <td>{item.spec}</td>
-                        <td>{item.quantity}</td>
-                        <td>¥{item.unitPrice.toFixed(2)}</td>
+                        <td>{item.quantity} 公斤</td>
+                        <td>¥{item.unitPrice.toFixed(2)}/公斤</td>
                         <td><strong>¥{(item.quantity * item.unitPrice).toFixed(2)}</strong></td>
                         <td><button className="icon-button danger-text" title="删除" onClick={() => removeItem(item.id)}><Trash size={16} /></button></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div className="prod-summary"><span>本人小计数量：<strong>{subQty}</strong></span><span>本人小计金额：<strong>¥{subAmount.toFixed(2)}</strong></span></div>
+                <div className="prod-summary"><span>本人小计数量：<strong>{subQty} 公斤</strong></span><span>本人小计金额：<strong>¥{subAmount.toFixed(2)}</strong></span></div>
               </Section>
             );
           })}
           <Section title="总数汇总">
-            <div className="prod-summary prod-grand"><span><Calculator size={20} />总数量：<strong>{grandTotalQty}</strong></span><span>总金额：<strong>¥{grandTotalAmount.toFixed(2)}</strong></span></div>
+            <div className="prod-summary prod-grand"><span><Calculator size={20} />总数量：<strong>{grandTotalQty} 公斤</strong></span><span>总金额：<strong>¥{grandTotalAmount.toFixed(2)}</strong></span></div>
           </Section>
         </>
       ) : (
@@ -150,7 +150,7 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
   return (
     <div>
       <PageHeader icon={<ModuleArtwork module={module} />} eyebrow="生产工序" title="定型" description="按颜色分组记录定型数量，每个颜色单独合计，最后汇总定型总数。" />
-      <Section title="录入记录" description="选择颜色或姓名，填写规格、数量和单价">
+      <Section title="录入记录" description="选择颜色或姓名，填写规格、数量(公斤)和单价(元/公斤)">
         <div className="production-input-row">
           <input className="prod-input" placeholder="姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <select className="prod-input" value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })}>
@@ -161,8 +161,8 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
             <option value="双">双</option>
             <option value="包">包</option>
           </select>
-          <input className="prod-input prod-num" type="number" min="0" placeholder="数量" value={draft.quantity || ""} onChange={(e) => setDraft({ ...draft, quantity: Number(e.target.value) || 0 })} />
-          <input className="prod-input prod-num" type="number" min="0" step="0.01" placeholder="单价" value={draft.unitPrice || ""} onChange={(e) => setDraft({ ...draft, unitPrice: Number(e.target.value) || 0 })} />
+          <input className="prod-input prod-num" type="number" min="0" placeholder="数量(公斤)" value={draft.quantity || ""} onChange={(e) => setDraft({ ...draft, quantity: Number(e.target.value) || 0 })} />
+          <input className="prod-input prod-num" type="number" min="0" step="0.01" placeholder="单价(元/公斤)" value={draft.unitPrice || ""} onChange={(e) => setDraft({ ...draft, unitPrice: Number(e.target.value) || 0 })} />
           <Button onClick={addItem}><Plus size={16} />添加</Button>
         </div>
       </Section>
@@ -174,26 +174,26 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
             return (
               <Section key={color} title={`颜色：${color}`} description={`${colorItems.length} 条记录`}>
                 <table className="prod-table">
-                  <thead><tr><th>姓名</th><th>规格</th><th>数量</th><th>单价</th><th>合计</th><th>操作</th></tr></thead>
+                  <thead><tr><th>姓名</th><th>规格</th><th>数量(公斤)</th><th>单价(元/公斤)</th><th>合计</th><th>操作</th></tr></thead>
                   <tbody>
                     {colorItems.map((item) => (
                       <tr key={item.id}>
                         <td>{item.name}</td>
                         <td>{item.spec}</td>
-                        <td>{item.quantity}</td>
-                        <td>¥{item.unitPrice.toFixed(2)}</td>
+                        <td>{item.quantity} 公斤</td>
+                        <td>¥{item.unitPrice.toFixed(2)}/公斤</td>
                         <td><strong>¥{(item.quantity * item.unitPrice).toFixed(2)}</strong></td>
                         <td><button className="icon-button danger-text" title="删除" onClick={() => removeItem(item.id)}><Trash size={16} /></button></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div className="prod-summary"><span>颜色小计数量：<strong>{subQty}</strong></span><span>颜色小计金额：<strong>¥{subAmount.toFixed(2)}</strong></span></div>
+                <div className="prod-summary"><span>颜色小计数量：<strong>{subQty} 公斤</strong></span><span>颜色小计金额：<strong>¥{subAmount.toFixed(2)}</strong></span></div>
               </Section>
             );
           })}
           <Section title="定型总数汇总">
-            <div className="prod-summary prod-grand"><span><Calculator size={20} />定型总数：<strong>{grandTotalQty}</strong></span><span>总金额：<strong>¥{grandTotalAmount.toFixed(2)}</strong></span></div>
+            <div className="prod-summary prod-grand"><span><Calculator size={20} />定型总数：<strong>{grandTotalQty} 公斤</strong></span><span>总金额：<strong>¥{grandTotalAmount.toFixed(2)}</strong></span></div>
           </Section>
         </>
       ) : (
