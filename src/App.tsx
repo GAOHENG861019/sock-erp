@@ -7,6 +7,7 @@ import { ExpenseRecordPage, ExpenseStatsPage } from "./pages/ExpensePages";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { CategoryPage } from "./pages/CategoryPage";
 import { MemberPage } from "./pages/MemberPage";
+import { PurchaseAuditPage } from "./pages/PurchaseAuditPage";
 import { Plus, Trash, Calculator } from "@phosphor-icons/react";
 import { ModuleArtwork } from "./components/ModuleArtwork";
 
@@ -25,7 +26,6 @@ const MachineLossPage = () => <ExpenseRecordPage eyebrow="设备维护" title="�
 const FreightPage = () => <ExpenseRecordPage eyebrow="物流费用" title="运货运费" description="记录货物运输、快递等运费支出。" module="diet" storageKey="sock-erp-freight" />;
 const SalaryPage = () => <ExpenseRecordPage eyebrow="人工成本" title="工资支出" description="记录员工工资、奖金等人工支出。" module="fitness" storageKey="sock-erp-salary" />;
 
-const PurchaseAuditPage = () => <PlaceholderPage eyebrow="审批流程" title="采购审核" description="采购单据审核与审批记录。" module="entertainment" />;
 const OutboundAuditPage = () => <PlaceholderPage eyebrow="审批流程" title="出库审核" description="出库单据审核与审批记录。" module="dashboard" />;
 const SalesAuditPage = () => <PlaceholderPage eyebrow="审批流程" title="销货审核" description="销货单据审核与审批记录。" module="media" />;
 

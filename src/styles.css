@@ -2242,3 +2242,33 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 .row-actions { display: flex; gap: 4px; }
 @media (max-width: 768px) { .member-stats { grid-template-columns: 1fr; } }
 
+
+
+/* ===== 采购审核 ===== */
+.audit-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+.audit-list { display: flex; flex-direction: column; gap: 12px; }
+.audit-item { padding: 16px 20px; border-radius: 14px; border: 1px solid var(--border); }
+.audit-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.audit-item-title { display: flex; align-items: center; gap: 10px; }
+.audit-title-text { font-size: 16px; font-weight: 600; color: var(--text); }
+.audit-item-amount { font-size: 18px; font-weight: 700; color: var(--accent); }
+.audit-item-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+.audit-comment { font-size: 13px; color: var(--text-muted); background: var(--surface); padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; }
+.audit-item-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.audit-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 8px; border: 1px solid; font-size: 13px; cursor: pointer; transition: all .15s; }
+.audit-btn.approve { border-color: #30a46c; color: #30a46c; background: transparent; }
+.audit-btn.approve:hover { background: #30a46c; color: #fff; }
+.audit-btn.reject { border-color: #e5484d; color: #e5484d; background: transparent; }
+.audit-btn.reject:hover { background: #e5484d; color: #fff; }
+.audit-form .form-grid { margin-bottom: 16px; }
+.audit-items-section { border-top: 1px solid var(--border); padding-top: 16px; margin-bottom: 16px; }
+.audit-items-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-weight: 600; color: var(--text); }
+.audit-item-row { display: grid; grid-template-columns: 2fr 1fr 0.8fr 0.8fr 1fr auto; gap: 8px; margin-bottom: 8px; align-items: center; }
+.audit-item-row input { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; }
+.audit-row-total { font-size: 13px; color: var(--text-muted); text-align: right; }
+.audit-form-total { text-align: right; font-size: 15px; color: var(--text); margin-top: 10px; }
+.audit-review-form .form-field { margin-bottom: 14px; }
+.audit-detail-meta { margin-bottom: 16px; }
+.audit-detail-meta p { margin: 6px 0; font-size: 14px; color: var(--text); }
+@media (max-width: 768px) { .audit-stats { grid-template-columns: repeat(2, 1fr); } .audit-item-row { grid-template-columns: 1fr 1fr; } }
+
