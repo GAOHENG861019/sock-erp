@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Check, Clock, ArrowRight, NotePencil, CalendarBlank, Plus, Barbell, ListPlus, Bug, Factory, Package } from "@phosphor-icons/react";
 import { api } from "../api";
 import { useWorkspace } from "../WorkspaceContext";
-import { localDate, formatDuration, formatDate, classNames } from "../utils";
+import { localDate, formatDate, classNames } from "../utils";
 import { Badge, Button, EmptyState, ErrorState, PageHeader, Section, Skeleton } from "../components/ui";
 import { ModuleArtwork, type ModuleArtworkName } from "../components/ModuleArtwork";
 
@@ -77,17 +77,11 @@ export function DashboardPage() {
   return (
     <div className="dashboard-page">
       <PageHeader icon={<ModuleArtwork module="dashboard" />} eyebrow={new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(new Date())} title={`${new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(new Date())}，从重点开始`} description="今天的行动、提醒和业务状态都在这里。" actions={<Button onClick={() => navigate("/today?new=1")}><Plus size={17} />添加本月事项</Button>} />
-      <div className="overview-strip">
-        <div><span>本月进度</span><strong>{value.overview.progress}<small>%</small></strong></div>
-        <div className="progress-track"><span style={{ width: `${value.overview.progress}%` }} /></div>
-        <div><span>已完成</span><strong>{value.overview.completed}<small> / {value.overview.total}</small></strong></div>
-        <div><span>已安排</span><strong>{formatDuration(value.overview.scheduledMinutes)}</strong></div>
-      </div>
-      <Section title="生产数据总览" description="翻袜、缝头、定型累计产量与仓库余量">
+      <Section title="生产数据总览" description="翻袜、缝头、定型累计金额与仓库余量">
         <div className="prod-overview-grid">
-          <div className="prod-overview-card" onClick={() => navigate("/fanwa")}><div className="pov-icon"><Factory size={22} /></div><span>翻袜</span><strong>{sumQty(fanwa)}</strong><small>数量 · ¥{sumAmt(fanwa).toFixed(0)}</small></div>
-          <div className="prod-overview-card" onClick={() => navigate("/fengtou")}><div className="pov-icon"><Factory size={22} /></div><span>缝头</span><strong>{sumQty(fengtou)}</strong><small>数量 · ¥{sumAmt(fengtou).toFixed(0)}</small></div>
-          <div className="prod-overview-card" onClick={() => navigate("/dingxing")}><div className="pov-icon"><Factory size={22} /></div><span>定型</span><strong>{sumQty(dingxing)}</strong><small>数量 · ¥{sumAmt(dingxing).toFixed(0)}</small></div>
+          <div className="prod-overview-card" onClick={() => navigate("/fanwa")}><div className="pov-icon"><Factory size={22} /></div><span>翻袜</span><strong>¥{sumAmt(fanwa).toFixed(0)}</strong><small>数量 {sumQty(fanwa)} 公斤</small></div>
+          <div className="prod-overview-card" onClick={() => navigate("/fengtou")}><div className="pov-icon"><Factory size={22} /></div><span>缝头</span><strong>¥{sumAmt(fengtou).toFixed(0)}</strong><small>数量 {sumQty(fengtou)} 公斤</small></div>
+          <div className="prod-overview-card" onClick={() => navigate("/dingxing")}><div className="pov-icon"><Factory size={22} /></div><span>定型</span><strong>¥{sumAmt(dingxing).toFixed(0)}</strong><small>数量 {sumQty(dingxing)} 公斤</small></div>
           <div className="prod-overview-card" onClick={() => navigate("/consulting")}><div className="pov-icon"><Package size={22} /></div><span>仓库余量</span><strong>{warehouseCount}</strong><small>项目+出入库记录</small></div>
         </div>
       </Section>
