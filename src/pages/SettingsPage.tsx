@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Database, FolderOpen, ShieldCheck, DownloadSimple, ArrowCounterClockwise, Trash, Sun, Moon, Check, Archive, Notebook, Stack, SquaresFour } from "@phosphor-icons/react";
+import { Database, FolderOpen, ShieldCheck, DownloadSimple, ArrowCounterClockwise, Trash, Sun, Moon, Check, Archive, Notebook, Stack, SquaresFour, Cloud, MagnifyingGlass, ArrowClockwise } from "@phosphor-icons/react";
 import { api } from "../api";
 import { useWorkspace } from "../WorkspaceContext";
 import type { CollectionName } from "../types";
@@ -16,6 +16,10 @@ export function SettingsPage() {
   const { data, run } = useWorkspace();
   const system = useQuery({ queryKey: ["system"], queryFn: api.systemStatus });
   const backups = useQuery({ queryKey: ["backups"], queryFn: api.backups });
+  const baiduConfig = useQuery({ queryKey: ["baidu-backup-config"], queryFn: api.baiduBackupConfig });
+  const [baiduPath, setBaiduPath] = useState("");
+  const [baiduSyncing, setBaiduSyncing] = useState(false);
+  const [baiduMsg, setBaiduMsg] = useState("");
   const [busy, setBusy] = useState("");
   const [restoreId, setRestoreId] = useState<string | null>(null);
   const [permanent, setPermanent] = useState<{ collection: CollectionName; id: string; title: string } | null>(null);
@@ -24,6 +28,49 @@ export function SettingsPage() {
   useEffect(() => { setDashboardModules(null); }, [data.settings.dashboardModules]);
   const createBackup = async () => { setBusy("backup"); try { await run(() => api.createBackup("手动备份", false)); } finally { setBusy(""); } };
   const exportAll = async () => { setBusy("export"); try { const result = await run(api.exportAll); window.location.href = result.downloadUrl; } finally { setBusy(""); } };
+  useEffect(() => { if (baiduConfig.data) setBaiduPath(baiduConfig.data.netdiskPath); }, [baiduConfig.data?.netdiskPath]);
+
+  const detectBaidu = async () => {
+    try {
+      const result = await api.detectBaiduNetdisk();
+      if (result.detected) {
+        setBaiduPath(result.detected);
+        setBaiduMsg("已自动检测到百度网盘目录");
+      } else {
+        setBaiduMsg("未检测到百度网盘目录，请手动填写路径");
+      }
+    } catch { setBaiduMsg("检测失败，请手动填写路径"); }
+  };
+
+  const saveBaiduConfig = async (updates: { enabled?: boolean; netdiskPath?: string }) => {
+    try {
+      await api.updateBaiduBackupConfig(updates);
+      await baiduConfig.refetch();
+      setBaiduMsg("设置已保存");
+    } catch (e) { setBaiduMsg("保存失败"); }
+  };
+
+  const syncBaidu = async () => {
+    setBaiduSyncing(true);
+    setBaiduMsg("");
+    try {
+      // 收集所有 sock-erp 前缀的 localStorage 数据
+      const lsData: Record<string, unknown> = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("sock-erp-")) {
+          lsData[key] = localStorage.getItem(key);
+        }
+      }
+      const result = await api.syncBaiduBackup(lsData);
+      setBaiduMsg(result.message);
+      await baiduConfig.refetch();
+    } catch (e) {
+      setBaiduMsg(`同步失败：${(e as Error).message}`);
+    } finally {
+      setBaiduSyncing(false);
+    }
+  };
   if (system.isLoading || backups.isLoading) return <><PageHeader icon={<ModuleArtwork module="settings" />} eyebrow="系统" title="数据与设置" description="检查本地数据和备份状态" /><Skeleton lines={8} /></>;
   if (system.error || backups.error) return <ErrorState message={((system.error || backups.error) as Error).message} onRetry={() => { void system.refetch(); void backups.refetch(); }} />;
   const status = system.data!;
@@ -48,6 +95,50 @@ export function SettingsPage() {
         </Section>
         <Section title="导出" description="生成包含 JSON 和各模块 CSV 的压缩包"><div className="export-panel"><DownloadSimple size={28} /><div><strong>完整数据导出</strong><p>适合人工查看和未来迁移，不替代完整备份。</p></div><Button variant="secondary" loading={busy === "export"} onClick={() => void exportAll()}>导出 ZIP</Button></div></Section>
       </div>
+
+      <Section title="百度网盘备份" description="将备份自动同步到百度网盘同步目录，无需额外服务器" action={
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button variant="secondary" onClick={() => void detectBaidu()}><MagnifyingGlass size={16} />自动检测</Button>
+          <Button loading={baiduSyncing} onClick={() => void syncBaidu()}><ArrowClockwise size={16} />立即同步</Button>
+        </div>
+      }>
+        <div className="baidu-backup-panel">
+          <div className="baidu-backup-row">
+            <label className="baidu-toggle">
+              <input
+                type="checkbox"
+                checked={baiduConfig.data?.enabled ?? false}
+                onChange={(e) => void saveBaiduConfig({ enabled: e.target.checked })}
+              />
+              <span>启用百度网盘自动备份</span>
+            </label>
+            {baiduConfig.data?.lastSyncStatus === "success" && baiduConfig.data.lastSyncAt ? (
+              <Badge tone="success"><Check size={12} />上次同步：{formatDateTime(baiduConfig.data.lastSyncAt)}</Badge>
+            ) : baiduConfig.data?.lastSyncStatus === "error" ? (
+              <Badge tone="danger">同步失败：{baiduConfig.data.lastSyncError || "未知错误"}</Badge>
+            ) : (
+              <Badge tone="neutral">尚未同步</Badge>
+            )}
+          </div>
+          <div className="baidu-path-row">
+            <span>网盘同步目录</span>
+            <input
+              type="text"
+              value={baiduPath}
+              onChange={(e) => setBaiduPath(e.target.value)}
+              placeholder="如：C:\Users\你的用户名\BaiduNetdisk"
+              onBlur={() => baiduPath !== baiduConfig.data?.netdiskPath && void saveBaiduConfig({ netdiskPath: baiduPath })}
+            />
+            <Button variant="ghost" size="sm" onClick={() => void saveBaiduConfig({ netdiskPath: baiduPath })}>保存路径</Button>
+          </div>
+          <div className="baidu-backup-hint">
+            <Cloud size={16} />
+            <span>启用后，每日自动备份完成后会自动复制到该目录下的 <code>sock-erp-backups</code> 文件夹。请确保已安装百度网盘客户端并登录，该目录会自动上传到云端。手动同步会同时备份浏览器中的业务数据。</span>
+          </div>
+          {baiduMsg ? <div className="baidu-backup-msg">{baiduMsg}</div> : null}
+          {baiduConfig.data?.syncCount ? <div className="baidu-stats">累计同步 {baiduConfig.data.syncCount} 次</div> : null}
+        </div>
+      </Section>
       <Section title="使用偏好" description="设置会保存在主数据文件中">
         <div className="preferences">
           <div><div><strong>界面风格</strong><small>功能和数据保持一致，只改变视觉系统</small></div><div className="appearance-toggle style-toggle" role="group" aria-label="界面风格"><button className={appearance === "liquid" ? "active" : ""} aria-label="Liquid Glass" aria-pressed={appearance === "liquid"} onClick={() => void saveSetting("appearance", "liquid")}><span><Stack size={17} /><strong>Liquid Glass</strong></span><small>环境色、透明材质与柔和层次</small></button><button className={appearance === "notebook" ? "active" : ""} aria-label="Notion 笔记" aria-pressed={appearance === "notebook"} onClick={() => void saveSetting("appearance", "notebook")}><span><Notebook size={17} /><strong>Notion 笔记</strong></span><small>紧凑画布、纯平表面与低饱和标记</small></button><button className={appearance === "neo" ? "active" : ""} aria-label="Neo-Brutalism" aria-pressed={appearance === "neo"} onClick={() => void saveSetting("appearance", "neo")}><span><SquaresFour size={17} /><strong>Neo-Brutalism</strong></span><small>多色印刷、硬边框与机械反馈</small></button></div></div>

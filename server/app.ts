@@ -8,6 +8,7 @@ import { getAppPaths, type AppPaths } from "./config.js";
 import { DatabaseManager } from "./database.js";
 import { AppStore, NotFoundError, ValidationError } from "./store.js";
 import { BackupManager } from "./backup.js";
+import { BaiduBackupManager } from "./baiduBackup.js";
 import { buildDashboard } from "./dashboard.js";
 import { collectionDefinitions, isCollectionName, sourceCollectionByType } from "./collections.js";
 import { openPathCommand } from "./platform.js";
@@ -27,6 +28,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   const manager = new DatabaseManager(paths);
   const store = new AppStore(manager);
   const backups = new BackupManager(manager, store, paths);
+  const baiduBackups = new BaiduBackupManager(paths, backups);
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: 2 * 1024 * 1024 });
 
   app.addHook("onRequest", async (request, reply) => {
@@ -229,6 +231,25 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     return reply.send(fs.createReadStream(file));
   });
 
+  // ===== 百度网盘备份 =====
+  app.get("/api/baidu-backup/config", async () => ({ data: baiduBackups.getConfig() }));
+  app.post("/api/baidu-backup/config", async (request) => {
+    const body = z.object({
+      enabled: z.boolean().optional(),
+      netdiskPath: z.string().optional(),
+    }).parse(request.body ?? {});
+    return { data: baiduBackups.updateConfig(body) };
+  });
+  app.get("/api/baidu-backup/detect", async () => ({
+    data: { detected: baiduBackups.detectNetdiskPath(), candidates: baiduBackups.listCandidates() },
+  }));
+  app.post("/api/baidu-backup/sync", async (request, reply) => {
+    const body = z.object({ localStorageData: z.record(z.string(), z.unknown()).optional() }).parse(request.body ?? {});
+    const result = await baiduBackups.syncToNetdisk(body.localStorageData);
+    return reply.code(201).send({ data: result });
+  });
+  app.get("/api/baidu-backup/remote", async () => ({ data: baiduBackups.listRemoteBackups() }));
+
   if (options.serveStatic ?? process.env.NODE_ENV === "production") {
     const root = path.resolve("dist");
     await app.register(fastifyStatic, {
@@ -255,7 +276,17 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   app.addHook("onClose", async () => manager.close());
 
   if (options.autoBackup ?? process.env.NODE_ENV !== "test") {
-    void backups.ensureDailyBackup().catch((error) => app.log.error(error, "自动备份失败"));
+    void backups.ensureDailyBackup().then(async () => {
+      // 每日备份后自动同步到百度网盘（仅 SQLite，localStorage 由前端手动同步时附带）
+      try {
+        const cfg = baiduBackups.getConfig();
+        if (cfg.enabled) {
+          await baiduBackups.syncToNetdisk();
+        }
+      } catch (error) {
+        app.log.error(error, "百度网盘自动同步失败");
+      }
+    }).catch((error) => app.log.error(error, "自动备份失败"));
   }
 
   return app;

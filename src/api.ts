@@ -54,4 +54,9 @@ export const api = {
   updateBackup: (id: string, input: { label?: string; keep?: boolean }) => request<BackupRecord>(`/api/backups/${id}/metadata`, { method: "PATCH", body: JSON.stringify(input) }),
   restoreBackup: (id: string) => request<{ restored: boolean }>(`/api/backups/${id}/restore`, { method: "POST" }),
   exportAll: () => request<{ filename: string; path: string; size: number; downloadUrl: string }>("/api/export", { method: "POST" }),
+  baiduBackupConfig: () => request<{ enabled: boolean; netdiskPath: string; lastSyncAt: string | null; lastSyncStatus: string; lastSyncError: string | null; syncCount: number }>("/api/baidu-backup/config"),
+  updateBaiduBackupConfig: (input: { enabled?: boolean; netdiskPath?: string }) => request("/api/baidu-backup/config", { method: "POST", body: JSON.stringify(input) }),
+  detectBaiduNetdisk: () => request<{ detected: string | null; candidates: Array<{ path: string; exists: boolean }> }>("/api/baidu-backup/detect"),
+  syncBaiduBackup: (localStorageData?: Record<string, unknown>) => request<{ synced: boolean; copiedFiles: string[]; message: string }>("/api/baidu-backup/sync", { method: "POST", body: JSON.stringify({ localStorageData }) }),
+  remoteBaiduBackups: () => request<Array<{ filename: string; size: number; createdAt: string }>>("/api/baidu-backup/remote"),
 };
