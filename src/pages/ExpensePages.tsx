@@ -87,11 +87,12 @@ export function ExpenseRecordPage({
   );
 }
 
-/** 支出统计页：三类支出占比、时间段筛选、导出报表 */
+/** 支出统计页：四类支出占比、时间段筛选、导出报表 */
 export function ExpenseStatsPage() {
   const [machine] = useLocalStorage<ExpenseItem[]>("sock-erp-machine-loss", []);
   const [freight] = useLocalStorage<ExpenseItem[]>("sock-erp-freight", []);
   const [salary] = useLocalStorage<ExpenseItem[]>("sock-erp-salary", []);
+  const [rawMaterials] = useLocalStorage<any[]>("sock-erp-raw-materials", []);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -106,11 +107,14 @@ export function ExpenseStatsPage() {
   const mFiltered = filterByDate(machine);
   const fFiltered = filterByDate(freight);
   const sFiltered = filterByDate(salary);
+  // 原材料无日期字段，全部纳入
+  const rFiltered = rawMaterials;
 
   const mTotal = mFiltered.reduce((s, i) => s + Number(i.amount || 0), 0);
   const fTotal = fFiltered.reduce((s, i) => s + Number(i.amount || 0), 0);
   const sTotal = sFiltered.reduce((s, i) => s + Number(i.amount || 0), 0);
-  const grandTotal = mTotal + fTotal + sTotal;
+  const rTotal = rFiltered.reduce((s, i) => s + Number(i.amount || 0), 0);
+  const grandTotal = mTotal + fTotal + sTotal + rTotal;
 
   const pct = (v: number) => grandTotal > 0 ? ((v / grandTotal) * 100).toFixed(1) : "0.0";
 
@@ -120,11 +124,13 @@ export function ExpenseStatsPage() {
       ...mFiltered.map((i) => ["机器损耗", i.date, i.amount, i.note]),
       ...fFiltered.map((i) => ["运货运费", i.date, i.amount, i.note]),
       ...sFiltered.map((i) => ["工资支出", i.date, i.amount, i.note]),
+      ...rFiltered.map((i) => ["原材料采购", i.date || "无日期", i.amount, `${i.name} ${i.spec || ""}`.trim()]),
       [],
       ["汇总", "", "", ""],
       ["机器损耗", "", mTotal.toFixed(2), `${pct(mTotal)}%`],
       ["运货运费", "", fTotal.toFixed(2), `${pct(fTotal)}%`],
       ["工资支出", "", sTotal.toFixed(2), `${pct(sTotal)}%`],
+      ["原材料采购", "", rTotal.toFixed(2), `${pct(rTotal)}%`],
       ["总计", "", grandTotal.toFixed(2), "100%"],
     ];
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -141,11 +147,12 @@ export function ExpenseStatsPage() {
     { name: "机器损耗", total: mTotal, color: "#e74c3c", route: "/entertainment" },
     { name: "运货运费", total: fTotal, color: "#3498db", route: "/sales-order" },
     { name: "工资支出", total: sTotal, color: "#2ecc71", route: "/salary" },
+    { name: "原材料采购", total: rTotal, color: "#f39c12", route: "/fitness" },
   ];
 
   return (
     <div>
-      <PageHeader icon={<ModuleArtwork module="dashboard" />} eyebrow="财务统计" title="支出统计" description="三类支出占比分析，支持时间段筛选和导出报表。" actions={<Button onClick={exportCSV}><Download size={16} />导出CSV</Button>} />
+      <PageHeader icon={<ModuleArtwork module="dashboard" />} eyebrow="财务统计" title="支出统计" description="四类支出占比分析，支持时间段筛选和导出报表。" actions={<Button onClick={exportCSV}><Download size={16} />导出CSV</Button>} />
       <Section title="筛选条件" description="按日期范围筛选支出记录">
         <div className="production-input-row">
           <span style={{ fontSize: 14, color: "#666" }}>开始日期</span>
@@ -155,7 +162,7 @@ export function ExpenseStatsPage() {
           {(startDate || endDate) && <Button variant="ghost" size="sm" onClick={() => { setStartDate(""); setEndDate(""); }}>清除筛选</Button>}
         </div>
       </Section>
-      <Section title="三类支出占比" description={`筛选范围内总支出 ¥${grandTotal.toFixed(2)}`}>
+      <Section title="四类支出占比" description={`筛选范围内总支出 ¥${grandTotal.toFixed(2)}`}>
         <div className="expense-stats-grid">
           {categories.map((cat) => (
             <div key={cat.name} className="expense-stat-card" style={{ borderTop: `4px solid ${cat.color}` }}>
@@ -171,6 +178,7 @@ export function ExpenseStatsPage() {
           <span>机器损耗 <strong style={{ color: "#e74c3c" }}>{pct(mTotal)}%</strong></span>
           <span>运货运费 <strong style={{ color: "#3498db" }}>{pct(fTotal)}%</strong></span>
           <span>工资支出 <strong style={{ color: "#2ecc71" }}>{pct(sTotal)}%</strong></span>
+          <span>原材料 <strong style={{ color: "#f39c12" }}>{pct(rTotal)}%</strong></span>
         </div>
       </Section>
       <Section title="支出明细汇总" description="筛选范围内的所有支出记录">
@@ -178,9 +186,9 @@ export function ExpenseStatsPage() {
           <table className="prod-table">
             <thead><tr><th>类别</th><th>日期</th><th>金额</th><th>备注</th></tr></thead>
             <tbody>
-              {[...mFiltered.map((i) => ({ ...i, cat: "机器损耗" })), ...fFiltered.map((i) => ({ ...i, cat: "运货运费" })), ...sFiltered.map((i) => ({ ...i, cat: "工资支出" }))].sort((a, b) => b.date.localeCompare(a.date)).map((item) => (
+              {[...mFiltered.map((i) => ({ ...i, cat: "机器损耗" })), ...fFiltered.map((i) => ({ ...i, cat: "运货运费" })), ...sFiltered.map((i) => ({ ...i, cat: "工资支出" })), ...rFiltered.map((i) => ({ id: i.id, date: i.date || "无日期", amount: i.amount, note: `${i.name} ${i.spec || ""}`.trim(), cat: "原材料采购" }))].sort((a, b) => String(b.date).localeCompare(String(a.date))).map((item) => (
                 <tr key={item.id}>
-                  <td><span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 12, background: item.cat === "机器损耗" ? "#fde8e8" : item.cat === "运货运费" ? "#e8f4fd" : "#e8f8ef", color: item.cat === "机器损耗" ? "#e74c3c" : item.cat === "运货运费" ? "#3498db" : "#2ecc71" }}>{item.cat}</span></td>
+                  <td><span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 12, background: item.cat === "机器损耗" ? "#fde8e8" : item.cat === "运货运费" ? "#e8f4fd" : item.cat === "原材料采购" ? "#fef5e7" : "#e8f8ef", color: item.cat === "机器损耗" ? "#e74c3c" : item.cat === "运货运费" ? "#3498db" : item.cat === "原材料采购" ? "#f39c12" : "#2ecc71" }}>{item.cat}</span></td>
                   <td>{item.date}</td>
                   <td>¥{Number(item.amount).toFixed(2)}</td>
                   <td>{item.note || "-"}</td>
