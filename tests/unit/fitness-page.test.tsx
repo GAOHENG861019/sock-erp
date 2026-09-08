@@ -1,0 +1,53 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { FitnessPage } from "../../src/pages/FitnessPage";
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
+
+describe("原材料采购", () => {
+  it("显示公斤单位和单价列", () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "1", name: "棉纱", spec: "32支", weight: 100, unitPrice: 25, amount: 2500 }
+    ]));
+    render(<FitnessPage />);
+    const text = document.body.textContent || "";
+    expect(text).toContain("重量(公斤)");
+    expect(text).toContain("单价(元/公斤)");
+    expect(text).toContain("100 公斤");
+    expect(text).toContain("¥25.00/公斤");
+    expect(text).toContain("¥2500.00");
+  });
+
+  it("总重量显示公斤", () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "1", name: "棉纱", spec: "32支", weight: 50, unitPrice: 20, amount: 1000 },
+      { id: "2", name: "橡筋", spec: "宽", weight: 30, unitPrice: 15, amount: 450 },
+    ]));
+    render(<FitnessPage />);
+    const text = document.body.textContent || "";
+    expect(text).toContain("80.00 公斤");
+    expect(text).toContain("¥1450.00");
+  });
+
+  it("无数据时显示空状态", () => {
+    render(<FitnessPage />);
+    expect(screen.getByText("还没有原材料")).toBeInTheDocument();
+  });
+
+  it("添加原材料按钮存在", () => {
+    render(<FitnessPage />);
+    expect(screen.getByText("添加原材料")).toBeInTheDocument();
+  });
+
+  it("原材料总额度显示", () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "1", name: "棉纱", spec: "32支", weight: 10, unitPrice: 30, amount: 300 },
+    ]));
+    render(<FitnessPage />);
+    const text = document.body.textContent || "";
+    expect(text).toContain("原材料总额度");
+    expect(text).toContain("¥300.00");
+  });
+});
