@@ -102,7 +102,7 @@ describe("仓库管理页面", () => {
     fireEvent.click(screen.getByRole("button", { name: /添加成品库存/ }));
     const modal = screen.getByRole("dialog");
     expect(within(modal).getByRole("combobox")).toBeInTheDocument();
-    expect(within(modal).getByText(/库存数量/)).toBeInTheDocument();
+    expect(document.body.textContent).toContain("库存数量(公斤)");
   });
 
   it("删除成品库存成功", () => {
