@@ -40,7 +40,7 @@ afterEach(() => {
 
 function addRecord(amount: string, note: string) {
   fireEvent.change(screen.getByPlaceholderText("金额"), { target: { value: amount } });
-  fireEvent.change(screen.getByPlaceholderText("备注"), { target: { value: note } });
+  fireEvent.change(screen.getByPlaceholderText("用途"), { target: { value: note } });
   fireEvent.click(screen.getByText("添加", { selector: "button" }));
 }
 
@@ -200,9 +200,9 @@ describe("图片上传专项", () => {
     mockFileReader("data:image/jpeg;base64,PHOTO");
     const { container } = render(<ExpenseRecordPage {...MACHINE_PROPS} />);
 
-    // 填金额 + 备注 + 选图
+    // 填金额 + 用途 + 选图
     fireEvent.change(screen.getByPlaceholderText("金额"), { target: { value: "66" } });
-    fireEvent.change(screen.getByPlaceholderText("备注"), { target: { value: "带凭证维修" } });
+    fireEvent.change(screen.getByPlaceholderText("用途"), { target: { value: "带凭证维修" } });
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(["img"], "receipt.jpg", { type: "image/jpeg" });
     fireEvent.change(fileInput, { target: { files: [file] } });

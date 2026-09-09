@@ -80,6 +80,17 @@ export function TodayPage() {
   const warehouseTotal = data.consultingProjects.length + data.consultingInteractions.length;
   const inventory = readLS<any[]>("sock-erp-inventory", []);
   const inventoryQty = inventory.reduce((s, i) => s + Number(i.quantity || 0), 0);
+  // 仓库余量按颜色统计（关联成品库存→定型颜色）
+  const finishedInv = readLS<any[]>("sock-erp-finished-inventory", []);
+  const dxMap: Record<string, any> = {};
+  dingxing.forEach((d) => { dxMap[d.id] = d; });
+  const warehouseByColor: Record<string, number> = {};
+  finishedInv.forEach((inv) => {
+    const dx = dxMap[inv.linkedId];
+    const color = dx?.color || "未分类";
+    warehouseByColor[color] = (warehouseByColor[color] || 0) + Number(inv.quantity || 0);
+  });
+  const warehouseColorText = Object.entries(warehouseByColor).map(([c, q]) => `${c}:${q}公斤`).join(" ") || "暂无库存";
   const machineLoss = readLS<any[]>("sock-erp-machine-loss", []);
   const freight = readLS<any[]>("sock-erp-freight", []);
   const salary = readLS<any[]>("sock-erp-salary", []);
@@ -91,7 +102,7 @@ export function TodayPage() {
   const overviewCards = [
     { label: "成品数量", value: finishedQty, color: "#3498db", icon: "📦" },
     { label: "仓库总量", value: `${warehouseTotal} 项`, color: "#2ecc71", icon: "🏭" },
-    { label: "库存余量", value: `${inventoryQty} 件`, color: "#9b59b6", icon: "📊" },
+    { label: "库存余量", value: warehouseColorText, color: "#9b59b6", icon: "📊" },
     { label: "本月支出", value: `¥${monthExpense.toFixed(0)}`, color: "#e74c3c", icon: "💸" },
     { label: "本月收入", value: `¥${monthIncome.toFixed(0)}`, color: "#f39c12", icon: "💰" },
   ];

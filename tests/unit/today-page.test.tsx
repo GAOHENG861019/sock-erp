@@ -104,4 +104,19 @@ describe("本月总览数据卡片", () => {
     renderToday();
     expect(screen.getByText("本月总览")).toBeInTheDocument();
   });
+
+  it("仓库余量按颜色显示", () => {
+    window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
+      { id: "dx1", name: "A", color: "白色", spec: "包", quantity: 100, unitPrice: 5 },
+      { id: "dx2", name: "B", color: "黑色", spec: "包", quantity: 50, unitPrice: 4 },
+    ]));
+    window.localStorage.setItem("sock-erp-finished-inventory", JSON.stringify([
+      { id: "fi1", linkedId: "dx1", quantity: 30, note: "" },
+      { id: "fi2", linkedId: "dx2", quantity: 20, note: "" },
+    ]));
+    renderToday();
+    const text = document.body.textContent || "";
+    expect(text).toContain("白色:30公斤");
+    expect(text).toContain("黑色:20公斤");
+  });
 });
