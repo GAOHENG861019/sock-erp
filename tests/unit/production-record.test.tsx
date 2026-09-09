@@ -13,9 +13,9 @@ beforeEach(() => {
 describe("生产记录-按规格计算", () => {
   it("翻袜录入框根据规格显示单位", () => {
     renderFanwa();
-    // 默认规格是双
-    expect(screen.getByPlaceholderText("数量(双)")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("单价(元/双)")).toBeInTheDocument();
+    // 默认规格是包
+    expect(screen.getByPlaceholderText("数量(包)")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("单价(元/包)")).toBeInTheDocument();
   });
 
   it("翻袜记录按规格显示数量和单价", () => {

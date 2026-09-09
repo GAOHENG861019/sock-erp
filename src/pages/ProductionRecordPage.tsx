@@ -57,7 +57,7 @@ export function ProductionRecordPage({
   storageKey: string;
 }) {
   const [items, setItems] = useLocalStorage<ProductionItem[]>(storageKey, []);
-  const [draft, setDraft] = useState<ProductionItem>({ id: "", name: "", spec: "双", quantity: 0, unitPrice: 0 });
+  const [draft, setDraft] = useState<ProductionItem>({ id: "", name: "", spec: "包", quantity: 0, unitPrice: 0 });
   const [editing, setEditing] = useState<ProductionItem | null>(null);
 
   const nameGroups = useMemo(() => {
@@ -73,7 +73,7 @@ export function ProductionRecordPage({
   const addItem = () => {
     if (!draft.name.trim()) return;
     setItems((prev) => [...prev, { ...draft, id: genId() }]);
-    setDraft({ id: "", name: "", spec: "双", quantity: 0, unitPrice: 0 });
+    setDraft({ id: "", name: "", spec: "包", quantity: 0, unitPrice: 0 });
   };
 
   const removeItem = (id: string) => setItems((prev) => prev.filter((item) => item.id !== id));
@@ -91,8 +91,8 @@ export function ProductionRecordPage({
         <div className="production-input-row">
           <input className="prod-input" placeholder="姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <select className="prod-input" value={draft.spec} onChange={(e) => setDraft({ ...draft, spec: e.target.value as "包" | "双" })}>
-            <option value="双">双</option>
             <option value="包">包</option>
+            <option value="双">双</option>
           </select>
           <input className="prod-input prod-num" type="number" min="0" placeholder={`数量(${draft.spec})`} value={draft.quantity || ""} onChange={(e) => setDraft({ ...draft, quantity: Number(e.target.value) || 0 })} />
           <input className="prod-input prod-num" type="number" min="0" step="0.01" placeholder={`单价(元/${draft.spec})`} value={draft.unitPrice || ""} onChange={(e) => setDraft({ ...draft, unitPrice: Number(e.target.value) || 0 })} />
@@ -163,7 +163,7 @@ export function ProductionRecordPage({
 /** 定型页：按颜色分组，每个颜色单独合计，数量按规格(双/包)计算 */
 export function DingxingPage({ module }: { module: ModuleArtworkName }) {
   const [items, setItems] = useLocalStorage<(ProductionItem & { color: string })[]>("sock-erp-dingxing", []);
-  const [draft, setDraft] = useState<ProductionItem & { color: string }>({ id: "", name: "", color: "白色", spec: "双", quantity: 0, unitPrice: 0 });
+  const [draft, setDraft] = useState<ProductionItem & { color: string }>({ id: "", name: "", color: "白色", spec: "包", quantity: 0, unitPrice: 0 });
   const [customColor, setCustomColor] = useState("");
   const [editing, setEditing] = useState<(ProductionItem & { color: string }) | null>(null);
 
@@ -180,7 +180,7 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
   const addItem = () => {
     if (!draft.name.trim()) return;
     setItems((prev) => [...prev, { ...draft, id: genId() }]);
-    setDraft({ id: "", name: "", color: "白色", spec: "双", quantity: 0, unitPrice: 0 });
+    setDraft({ id: "", name: "", color: "白色", spec: "包", quantity: 0, unitPrice: 0 });
   };
 
   const removeItem = (id: string) => setItems((prev) => prev.filter((item) => item.id !== id));
@@ -204,8 +204,8 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
           </select>
           <input className="prod-input" placeholder="自定义颜色" value={customColor} onChange={(e) => setCustomColor(e.target.value)} onBlur={() => { if (customColor.trim()) { setDraft({ ...draft, color: customColor.trim() }); setCustomColor(""); } }} />
           <select className="prod-input" value={draft.spec} onChange={(e) => setDraft({ ...draft, spec: e.target.value as "包" | "双" })}>
-            <option value="双">双</option>
             <option value="包">包</option>
+            <option value="双">双</option>
           </select>
           <input className="prod-input prod-num" type="number" min="0" placeholder={`数量(${draft.spec})`} value={draft.quantity || ""} onChange={(e) => setDraft({ ...draft, quantity: Number(e.target.value) || 0 })} />
           <input className="prod-input prod-num" type="number" min="0" step="0.01" placeholder={`单价(元/${draft.spec})`} value={draft.unitPrice || ""} onChange={(e) => setDraft({ ...draft, unitPrice: Number(e.target.value) || 0 })} />
