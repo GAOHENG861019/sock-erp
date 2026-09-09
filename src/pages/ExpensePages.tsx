@@ -50,11 +50,11 @@ export function ExpenseRecordPage({
   return (
     <div>
       <PageHeader icon={<ModuleArtwork module={module} />} eyebrow={eyebrow} title={title} description={description} actions={<Button onClick={addItem}><Plus size={16} />添加记录</Button>} />
-      <Section title="录入支出" description="填写日期、金额和备注，可上传凭证照片">
+      <Section title="录入支出" description="填写日期、用途和金额，可上传凭证照片">
         <div className="production-input-row">
           <input className="prod-input" type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+          <input className="prod-input" placeholder="用途" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} style={{ minWidth: 180 }} />
           <input className="prod-input prod-num" type="number" min="0" step="0.01" placeholder="金额" value={draft.amount || ""} onChange={(e) => setDraft({ ...draft, amount: Number(e.target.value) || 0 })} />
-          <input className="prod-input" placeholder="备注" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} style={{ minWidth: 180 }} />
           <label style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", fontSize: 13, color: "#666" }}>
             <input type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
             📷 {draft.photo ? "已选" : "凭证"}
@@ -67,13 +67,13 @@ export function ExpenseRecordPage({
       {items.length ? (
         <Section title="支出明细" description={`共 ${items.length} 条`}>
           <table className="prod-table">
-            <thead><tr><th>日期</th><th>金额</th><th>备注</th><th>凭证</th><th>操作</th></tr></thead>
+            <thead><tr><th>日期</th><th>用途</th><th>金额</th><th>凭证</th><th>操作</th></tr></thead>
             <tbody>
               {[...items].sort((a, b) => b.date.localeCompare(a.date)).map((item) => (
                 <tr key={item.id}>
                   <td>{item.date}</td>
-                  <td><strong>¥{Number(item.amount).toFixed(2)}</strong></td>
                   <td>{item.note || "-"}</td>
+                  <td><strong>¥{Number(item.amount).toFixed(2)}</strong></td>
                   <td>{item.photo ? <img src={item.photo} alt="凭证" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }} /> : <span style={{ color: "#999", fontSize: 12 }}>无</span>}</td>
                   <td><button className="icon-button danger-text" title="删除" onClick={() => removeItem(item.id)}><Trash size={16} /></button></td>
                 </tr>
@@ -120,11 +120,11 @@ export function ExpenseStatsPage() {
 
   const exportCSV = () => {
     const rows = [
-      ["类别", "日期", "金额", "备注"],
-      ...mFiltered.map((i) => ["机器损耗", i.date, i.amount, i.note]),
-      ...fFiltered.map((i) => ["运货运费", i.date, i.amount, i.note]),
-      ...sFiltered.map((i) => ["工资支出", i.date, i.amount, i.note]),
-      ...rFiltered.map((i) => ["原材料采购", i.date || "无日期", i.amount, `${i.name} ${i.spec || ""}`.trim()]),
+      ["类别", "日期", "用途", "金额"],
+      ...mFiltered.map((i) => ["机器损耗", i.date, i.note, i.amount]),
+      ...fFiltered.map((i) => ["运货运费", i.date, i.note, i.amount]),
+      ...sFiltered.map((i) => ["工资支出", i.date, i.note, i.amount]),
+      ...rFiltered.map((i) => ["原材料采购", i.date || "无日期", `${i.name} ${i.spec || ""}`.trim(), i.amount]),
       [],
       ["汇总", "", "", ""],
       ["机器损耗", "", mTotal.toFixed(2), `${pct(mTotal)}%`],
@@ -184,14 +184,14 @@ export function ExpenseStatsPage() {
       <Section title="支出明细汇总" description="筛选范围内的所有支出记录">
         {grandTotal > 0 ? (
           <table className="prod-table">
-            <thead><tr><th>类别</th><th>日期</th><th>金额</th><th>备注</th></tr></thead>
+            <thead><tr><th>类别</th><th>日期</th><th>用途</th><th>金额</th></tr></thead>
             <tbody>
               {[...mFiltered.map((i) => ({ ...i, cat: "机器损耗" })), ...fFiltered.map((i) => ({ ...i, cat: "运货运费" })), ...sFiltered.map((i) => ({ ...i, cat: "工资支出" })), ...rFiltered.map((i) => ({ id: i.id, date: i.date || "无日期", amount: i.amount, note: `${i.name} ${i.spec || ""}`.trim(), cat: "原材料采购" }))].sort((a, b) => String(b.date).localeCompare(String(a.date))).map((item) => (
                 <tr key={item.id}>
                   <td><span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 12, background: item.cat === "机器损耗" ? "#fde8e8" : item.cat === "运货运费" ? "#e8f4fd" : item.cat === "原材料采购" ? "#fef5e7" : "#e8f8ef", color: item.cat === "机器损耗" ? "#e74c3c" : item.cat === "运货运费" ? "#3498db" : item.cat === "原材料采购" ? "#f39c12" : "#2ecc71" }}>{item.cat}</span></td>
                   <td>{item.date}</td>
-                  <td>¥{Number(item.amount).toFixed(2)}</td>
                   <td>{item.note || "-"}</td>
+                  <td>¥{Number(item.amount).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

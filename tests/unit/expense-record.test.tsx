@@ -14,7 +14,7 @@ describe("支出记录-增删功能", () => {
   it("添加记录成功", () => {
     renderExpense("机器损耗", "test-machine");
     fireEvent.change(screen.getByPlaceholderText("金额"), { target: { value: "100" } });
-    fireEvent.change(screen.getByPlaceholderText("备注"), { target: { value: "维修电机" } });
+    fireEvent.change(screen.getByPlaceholderText("用途"), { target: { value: "维修电机" } });
     fireEvent.click(screen.getByText("添加", { selector: "button" }));
 
     const text = document.body.textContent || "";
@@ -62,5 +62,17 @@ describe("支出记录-增删功能", () => {
     const text = document.body.textContent || "";
     expect(text).toContain("1月工资");
     expect(text).toContain("¥5000.00");
+  });
+
+  it("用途字段在金额前面，不显示备注", () => {
+    renderExpense("机器损耗", "test-machine");
+    const inputs = document.querySelectorAll(".production-input-row input");
+    const placeholders = Array.from(inputs).map((i) => (i as HTMLInputElement).placeholder);
+    const yongtuIdx = placeholders.indexOf("用途");
+    const jineIdx = placeholders.indexOf("金额");
+    expect(yongtuIdx).toBeGreaterThan(-1);
+    expect(jineIdx).toBeGreaterThan(-1);
+    expect(yongtuIdx).toBeLessThan(jineIdx);
+    expect(placeholders).not.toContain("备注");
   });
 });
