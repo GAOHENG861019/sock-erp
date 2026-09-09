@@ -293,6 +293,10 @@ export function CategoryPage() {
                   <div>
                     <div className="category-name">{cat.name}</div>
                     {cat.description ? <div className="category-desc">{cat.description}</div> : null}
+                    {(() => {
+                      const linkedText = getLinkedText(cat);
+                      return linkedText ? <div className="category-desc">关联：{linkedText}</div> : null;
+                    })()}
                   </div>
                 </div>
                 <div className="category-item-actions">

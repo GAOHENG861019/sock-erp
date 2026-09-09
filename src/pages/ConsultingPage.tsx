@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash, Users } from "@phosphor-icons/react";
+import { Plus, Pencil, Trash } from "@phosphor-icons/react";
 import { api } from "../api";
 import { useWorkspace } from "../WorkspaceContext";
 import { Button, ConfirmDialog, EmptyState, EntityForm, Modal, PageHeader, Section, type FieldDefinition } from "../components/ui";
