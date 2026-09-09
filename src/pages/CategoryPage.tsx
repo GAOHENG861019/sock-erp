@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash, Tag, Archive, DotsSixVertical } from "@phosphor-icons/react";
 import { PageHeader, Section, Button, Modal, EntityForm, ConfirmDialog, EmptyState, Badge } from "../components/ui";
+import type { FieldDefinition } from "../components/ui";
 import { ModuleArtwork } from "../components/ModuleArtwork";
 
 type Category = {
@@ -9,6 +10,25 @@ type Category = {
   description: string;
   sortOrder: number;
   createdAt: string;
+  linkedId?: string;
+};
+
+type DingxingRecord = {
+  id: string;
+  name: string;
+  color: string;
+  spec: string;
+  quantity?: number;
+  unitPrice?: number;
+};
+
+type RawMaterialRecord = {
+  id: string;
+  name: string;
+  spec: string;
+  weight?: number;
+  unitPrice?: number;
+  amount?: number;
 };
 
 type CategoryType = "product" | "material";
@@ -38,6 +58,25 @@ function writeCategories(type: CategoryType, list: Category[]) {
   localStorage.setItem(STORAGE_KEYS[type], JSON.stringify(list));
 }
 
+function readJsonArray<T = any>(key: string): T[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function readDingxing(): DingxingRecord[] {
+  return readJsonArray<DingxingRecord>("sock-erp-dingxing");
+}
+
+function readRawMaterials(): RawMaterialRecord[] {
+  return readJsonArray<RawMaterialRecord>("sock-erp-raw-materials");
+}
+
 function genId() {
   return `cat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -63,6 +102,43 @@ export function CategoryPage() {
     [currentList]
   );
 
+  // 关联数据源：定型数据（商品分类关联）与原材料采购数据（原材料分类关联）
+  const dingxingList = useMemo(() => readDingxing(), []);
+  const rawMaterialList = useMemo(() => readRawMaterials(), []);
+
+  const dingxingOptions = useMemo(
+    () => [
+      { value: "", label: "不关联" },
+      ...dingxingList.map((d) => ({
+        value: d.id,
+        label: `${d.color ?? ""} - ${d.spec ?? ""} - ${d.name ?? ""}`,
+      })),
+    ],
+    [dingxingList]
+  );
+
+  const rawMaterialOptions = useMemo(
+    () => [
+      { value: "", label: "不关联" },
+      ...rawMaterialList.map((r) => ({
+        value: r.id,
+        label: `${r.name ?? ""} - ${r.spec ?? ""}`,
+      })),
+    ],
+    [rawMaterialList]
+  );
+
+  // 根据分类的 linkedId 查找关联记录的展示文案
+  function getLinkedText(cat: Category): string | null {
+    if (!cat.linkedId) return null;
+    if (activeType === "product") {
+      const d = dingxingList.find((x) => x.id === cat.linkedId);
+      return d ? `${d.color ?? ""} / ${d.spec ?? ""}` : null;
+    }
+    const r = rawMaterialList.find((x) => x.id === cat.linkedId);
+    return r ? r.name ?? null : null;
+  }
+
   function updateList(type: CategoryType, list: Category[]) {
     writeCategories(type, list);
     if (type === "product") setProductList(list);
@@ -84,7 +160,12 @@ export function CategoryPage() {
     if (editing) {
       const idx = list.findIndex((c) => c.id === editing.id);
       if (idx >= 0) {
-        list[idx] = { ...list[idx], name: String(values.name).trim(), description: String(values.description ?? "").trim() };
+        list[idx] = {
+          ...list[idx],
+          name: String(values.name).trim(),
+          description: String(values.description ?? "").trim(),
+          linkedId: String(values.linkedId ?? ""),
+        };
       }
     } else {
       // 自动分配排序号：当前最大序号 + 1
@@ -95,6 +176,7 @@ export function CategoryPage() {
         description: String(values.description ?? "").trim(),
         sortOrder: maxOrder + 1,
         createdAt: new Date().toISOString(),
+        linkedId: String(values.linkedId ?? ""),
       });
     }
     updateList(activeType, list);
@@ -151,9 +233,12 @@ export function CategoryPage() {
     setDragOverId(null);
   }
 
-  const fields = [
-    { name: "name", label: "分类名称", type: "text" as const, required: true, placeholder: "如：棉袜 / 纱线" },
-    { name: "description", label: "分类说明", type: "textarea" as const, placeholder: "可选，描述该分类的用途" },
+  const fields: FieldDefinition[] = [
+    { name: "name", label: "分类名称", type: "text", required: true, placeholder: "如：棉袜 / 纱线" },
+    { name: "description", label: "分类说明", type: "textarea", placeholder: "可选，描述该分类的用途" },
+    activeType === "product"
+      ? { name: "linkedId", label: "关联定型", type: "select", options: dingxingOptions }
+      : { name: "linkedId", label: "关联原材料", type: "select", options: rawMaterialOptions },
   ];
 
   return (
