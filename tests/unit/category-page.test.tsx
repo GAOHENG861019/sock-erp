@@ -204,4 +204,116 @@ describe("分类中心页面", () => {
     expect(saved[0].sortOrder).toBe(1);
     expect(saved[1].sortOrder).toBe(2);
   });
+
+  it("商品分类表单包含关联定型下拉框", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
+    const modal = screen.getByRole("dialog");
+    expect(within(modal).getByLabelText(/关联定型/)).toBeInTheDocument();
+  });
+
+  it("原材料分类表单包含关联原材料下拉框", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: /原材料分类/ }));
+    fireEvent.click(screen.getByRole("button", { name: /添加原材料分类/ }));
+    const modal = screen.getByRole("dialog");
+    expect(within(modal).getByLabelText(/关联原材料/)).toBeInTheDocument();
+  });
+
+  it("添加商品分类时选择关联定型，保存后卡片显示关联信息", async () => {
+    window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
+      { id: "dx1", name: "张三", color: "白色", spec: "双", quantity: 100, unitPrice: 5 },
+    ]));
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
+    const modal = screen.getByRole("dialog");
+    fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "船袜" } });
+    fireEvent.change(within(modal).getByLabelText(/关联定型/), { target: { value: "dx1" } });
+    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+
+    expect(await screen.findByText("船袜")).toBeInTheDocument();
+    expect(screen.getByText(/关联：白色 \/ 双/)).toBeInTheDocument();
+  });
+
+  it("添加原材料分类时选择关联原材料，保存后卡片显示关联信息", async () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "rm1", name: "3075纱线", spec: "18D", weight: 1, unitPrice: 20, amount: 20 },
+    ]));
+    renderPage();
+
+    fireEvent.click(screen.getByRole("tab", { name: /原材料分类/ }));
+    fireEvent.click(screen.getByRole("button", { name: /添加原材料分类/ }));
+    const modal = screen.getByRole("dialog");
+    fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "纱线分类" } });
+    fireEvent.change(within(modal).getByLabelText(/关联原材料/), { target: { value: "rm1" } });
+    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+
+    expect(await screen.findByText("纱线分类")).toBeInTheDocument();
+    expect(screen.getByText(/关联：3075纱线/)).toBeInTheDocument();
+  });
+
+  it("编辑分类时可以修改关联项", async () => {
+    window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
+      { id: "dx1", name: "张三", color: "白色", spec: "双", quantity: 100, unitPrice: 5 },
+      { id: "dx2", name: "李四", color: "黑色", spec: "包", quantity: 50, unitPrice: 10 },
+    ]));
+    renderPage();
+
+    // 先添加并关联 dx1
+    fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
+    let modal = screen.getByRole("dialog");
+    fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "船袜" } });
+    fireEvent.change(within(modal).getByLabelText(/关联定型/), { target: { value: "dx1" } });
+    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    expect(await screen.findByText(/关联：白色 \/ 双/)).toBeInTheDocument();
+
+    // 编辑，改为关联 dx2
+    fireEvent.click(screen.getByLabelText("编辑"));
+    modal = screen.getByRole("dialog");
+    fireEvent.change(within(modal).getByLabelText(/关联定型/), { target: { value: "dx2" } });
+    fireEvent.click(within(modal).getByRole("button", { name: /保存修改/ }));
+
+    expect(await screen.findByText(/关联：黑色 \/ 包/)).toBeInTheDocument();
+    expect(screen.queryByText(/关联：白色 \/ 双/)).not.toBeInTheDocument();
+  });
+
+  it("不选择关联时分类卡片不显示关联信息", async () => {
+    window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
+      { id: "dx1", name: "张三", color: "白色", spec: "双", quantity: 100, unitPrice: 5 },
+    ]));
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
+    const modal = screen.getByRole("dialog");
+    fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "无关联分类" } });
+    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+
+    expect(await screen.findByText("无关联分类")).toBeInTheDocument();
+    expect(screen.queryByText(/关联：/)).not.toBeInTheDocument();
+  });
+
+  it("关联数据从 localStorage 正确读取为下拉选项", () => {
+    window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
+      { id: "dx1", name: "张三", color: "白色", spec: "双", quantity: 100, unitPrice: 5 },
+    ]));
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "rm1", name: "3075纱线", spec: "18D", weight: 1, unitPrice: 20, amount: 20 },
+    ]));
+    renderPage();
+
+    // 商品分类表单：关联定型下拉应包含定型记录选项
+    fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
+    let modal = screen.getByRole("dialog");
+    const productSelect = within(modal).getByLabelText(/关联定型/) as HTMLSelectElement;
+    expect(within(productSelect).getByText("白色 - 双 - 张三")).toBeInTheDocument();
+    fireEvent.click(within(modal).getByRole("button", { name: "取消" }));
+
+    // 原材料分类表单：关联原材料下拉应包含原材料记录选项
+    fireEvent.click(screen.getByRole("tab", { name: /原材料分类/ }));
+    fireEvent.click(screen.getByRole("button", { name: /添加原材料分类/ }));
+    modal = screen.getByRole("dialog");
+    const materialSelect = within(modal).getByLabelText(/关联原材料/) as HTMLSelectElement;
+    expect(within(materialSelect).getByText("3075纱线 - 18D")).toBeInTheDocument();
+  });
 });

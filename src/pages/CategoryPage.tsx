@@ -317,7 +317,7 @@ export function CategoryPage() {
       >
         <EntityForm
           fields={fields}
-          initial={editing ? { name: editing.name, description: editing.description } : {}}
+          initial={editing ? { name: editing.name, description: editing.description, linkedId: editing.linkedId ?? "" } : {}}
           submitLabel={editing ? "保存修改" : "添加分类"}
           onSubmit={handleSubmit}
           onCancel={() => { setModalOpen(false); setEditing(null); }}
