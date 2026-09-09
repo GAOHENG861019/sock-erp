@@ -61,6 +61,20 @@ describe("本月总览数据卡片", () => {
     expect(text).toContain("150双");
   });
 
+  it("定型按颜色分别显示", () => {
+    window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
+      { id: "1", name: "A", color: "白色", spec: "包", quantity: 100, unitPrice: 5 },
+      { id: "2", name: "B", color: "黑色", spec: "包", quantity: 50, unitPrice: 4 },
+    ]));
+    renderToday();
+    const text = document.body.textContent || "";
+    expect(text).toContain("定型按颜色统计");
+    expect(text).toContain("白色");
+    expect(text).toContain("黑色");
+    expect(text).toContain("100包");
+    expect(text).toContain("50包");
+  });
+
   it("本月支出包含四类费用", () => {
     window.localStorage.setItem("sock-erp-machine-loss", JSON.stringify([
       { id: "1", date: "2024-01-01", amount: 100, note: "" },
