@@ -46,6 +46,7 @@ const router = createBrowserRouter([
       { path: "media", element: <LazyPage><MediaPage /></LazyPage> },
       { path: "development", element: <LazyPage><DevelopmentPage /></LazyPage> },
       { path: "consulting", element: <WarehousePage /> },
+      { path: "warehouse", element: <WarehousePage /> },
       { path: "customer", element: <LazyPage><ConsultingPage /></LazyPage> },
       { path: "category", element: <CategoryPage /> },
       { path: "fitness", element: <LazyPage><FitnessPage /></LazyPage> },

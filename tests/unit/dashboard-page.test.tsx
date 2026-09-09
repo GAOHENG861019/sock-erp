@@ -90,4 +90,34 @@ describe("首页总览", () => {
     renderDashboard();
     expect(screen.getByText("生产数据总览")).toBeInTheDocument();
   });
+
+  it("不显示本月时间线", () => {
+    renderDashboard();
+    expect(screen.queryByText("本月时间线")).not.toBeInTheDocument();
+  });
+
+  it("显示当日产量而不是事项", () => {
+    renderDashboard();
+    const text = document.body.textContent || "";
+    expect(text).toContain("当日产量");
+    expect(text).not.toContain("本月时间线");
+  });
+
+  it("显示产品中心卡片", () => {
+    renderDashboard();
+    expect(screen.getByText("产品中心")).toBeInTheDocument();
+  });
+
+  it("仓库余量按颜色显示", () => {
+    window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
+      { id: "dx1", name: "张三", color: "白色", spec: "包", quantity: 100, unitPrice: 5 },
+    ]));
+    window.localStorage.setItem("sock-erp-finished-inventory", JSON.stringify([
+      { id: "fi1", linkedId: "dx1", quantity: 50, note: "" },
+    ]));
+    renderDashboard();
+    const text = document.body.textContent || "";
+    expect(text).toContain("白色");
+    expect(text).toContain("50包");
+  });
 });
