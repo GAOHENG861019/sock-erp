@@ -62,12 +62,21 @@ export function TodayPage() {
     try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }
   };
   const dingxing = readLS<any[]>("sock-erp-dingxing", []);
-  const finishedShuang = dingxing.filter((i) => i.spec === "双").reduce((s, i) => s + Number(i.quantity || 0), 0);
   const finishedBao = dingxing.filter((i) => i.spec === "包").reduce((s, i) => s + Number(i.quantity || 0), 0);
-  const finishedParts: string[] = [];
-  if (finishedShuang) finishedParts.push(`${finishedShuang}双`);
-  if (finishedBao) finishedParts.push(`${finishedBao}包`);
-  const finishedQty = finishedParts.length ? finishedParts.join("+") : "0";
+  const finishedShuang = dingxing.filter((i) => i.spec === "双").reduce((s, i) => s + Number(i.quantity || 0), 0);
+  const finishedQty = finishedBao ? `${finishedBao}包` : finishedShuang ? `${finishedShuang}双` : "0";
+  // 定型按颜色分组
+  const dingxingByColor = useMemo(() => {
+    const groups: Record<string, { bao: number; shuang: number; amount: number }> = {};
+    dingxing.forEach((d) => {
+      const color = d.color || "未分类";
+      if (!groups[color]) groups[color] = { bao: 0, shuang: 0, amount: 0 };
+      if (d.spec === "包") groups[color].bao += Number(d.quantity || 0);
+      else groups[color].shuang += Number(d.quantity || 0);
+      groups[color].amount += Number(d.quantity || 0) * Number(d.unitPrice || 0);
+    });
+    return groups;
+  }, [dingxing]);
   const warehouseTotal = data.consultingProjects.length + data.consultingInteractions.length;
   const inventory = readLS<any[]>("sock-erp-inventory", []);
   const inventoryQty = inventory.reduce((s, i) => s + Number(i.quantity || 0), 0);
@@ -89,7 +98,7 @@ export function TodayPage() {
 
   return (
     <div>
-      <PageHeader icon={<ModuleArtwork module="today" />} eyebrow="月度执行" title="本月总览" description="只安排本月何时执行什么，业务详情仍留在对应模块。" actions={<Button onClick={() => openForm()}><CalendarPlus size={18} />添加事项</Button>} />
+      <PageHeader icon={<ModuleArtwork module="today" />} eyebrow="月度执行" title="本月总览" description="只安排本月何时执行什么，业务详情仍留在对应模块。" actions={<Button onClick={() => openForm()}><CalendarPlus size={18} />添加当日产量</Button>} />
       <div className="month-overview-grid">
         {overviewCards.map((card) => (
           <div key={card.label} className="month-overview-card" style={{ borderLeft: `4px solid ${card.color}` }}>
@@ -101,6 +110,25 @@ export function TodayPage() {
           </div>
         ))}
       </div>
+      <Section title="定型按颜色统计" description="成品定型按颜色分别统计数量和金额">
+        {Object.keys(dingxingByColor).length ? (
+          <div className="prod-overview-grid">
+            {Object.entries(dingxingByColor).map(([color, stats]) => {
+              const parts: string[] = [];
+              if (stats.bao) parts.push(`${stats.bao}包`);
+              if (stats.shuang) parts.push(`${stats.shuang}双`);
+              return (
+                <div key={color} className="prod-overview-card">
+                  <div className="pov-icon" style={{ background: "#9b59b620", color: "#9b59b6" }}>🎨</div>
+                  <span>{color}</span>
+                  <strong>{parts.join("+") || "0"}</strong>
+                  <small>¥{stats.amount.toFixed(0)}</small>
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="quiet-line">暂无定型记录</p>}
+      </Section>
       <div className="plan-toolbar">
         <div className="segmented" role="tablist">{(["today", "week", "history"] as const).map((key) => <button key={key} className={view === key ? "active" : ""} onClick={() => setView(key)}>{key === "today" ? "今日" : key === "week" ? "本周" : "历史"}</button>)}</div>
         <label className="date-control"><span>起始日期</span><input type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} /></label>
@@ -114,7 +142,7 @@ export function TodayPage() {
           <div className="plan-copy"><strong>{item.display_title || item.title}</strong><small>{item.notes || (item.source_module ? `来自 ${sourceLabels[item.source_module] ?? item.source_module}` : "独立事项")}</small>{item.source_module ? <button className="text-button source-link" onClick={() => navigate(sourceRoutes[item.source_module] ?? "/")}>打开来源 <ArrowSquareOut size={13} /></button> : null}</div>
           <Badge tone={item.priority === "high" ? "warning" : item.status === "done" ? "success" : "neutral"}>{item.status === "done" ? "已完成" : item.priority === "high" ? "高优先" : "待处理"}</Badge>
           <div className="row-menu-wrap"><button className="icon-button" onClick={() => setMenu(menu === item.id ? null : item.id)}><DotsThree size={20} /></button>{menu === item.id ? <div className="row-menu"><button onClick={() => { openForm(item); setMenu(null); }}><Clock size={15} />调整时间</button><button onClick={() => void run(() => api.update("planItems", item.id, { status: "doing" }))}><Play size={15} />开始执行</button><button onClick={() => void run(() => api.postponePlan(item.id, addDays(item.plan_date, 1)))}><ArrowBendDownRight size={15} />移到明天</button><button onClick={() => void run(() => api.update("planItems", item.id, { status: "cancelled" }))}><X size={15} />取消</button><button className="danger" onClick={() => void run(() => api.remove("planItems", item.id))}><Trash size={15} />移到回收站</button></div> : null}</div>
-        </div>)}</div> : <EmptyState title="这个时间范围还没有计划" description="添加第一件需要执行的事情。" action={<Button variant="secondary" onClick={() => openForm()}>添加事项</Button>} />}
+        </div>)}</div> : <EmptyState title="这个时间范围还没有计划" description="添加第一件需要执行的事情。" action={<Button variant="secondary" onClick={() => openForm()}>添加当日产量</Button>} />}
       </Section>
       {view === "today" ? <Section title="当日复盘" description="一句话记录今天做得如何"><textarea className="review-input" value={review} onChange={(event) => setReview(event.target.value)} onBlur={() => void persistReview().catch(() => undefined)} placeholder="今天最值得记住的进展、问题或调整……" /></Section> : null}
       <Modal open={newOpen || editing !== null} title={editing?.id ? "编辑计划事项" : "添加计划事项"} description="时间可以暂时留空，之后再安排。" onClose={closeForm}>
