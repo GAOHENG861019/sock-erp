@@ -62,7 +62,12 @@ export function TodayPage() {
     try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }
   };
   const dingxing = readLS<any[]>("sock-erp-dingxing", []);
-  const finishedQty = dingxing.reduce((s, i) => s + Number(i.quantity || 0), 0);
+  const finishedShuang = dingxing.filter((i) => i.spec === "双").reduce((s, i) => s + Number(i.quantity || 0), 0);
+  const finishedBao = dingxing.filter((i) => i.spec === "包").reduce((s, i) => s + Number(i.quantity || 0), 0);
+  const finishedParts: string[] = [];
+  if (finishedShuang) finishedParts.push(`${finishedShuang}双`);
+  if (finishedBao) finishedParts.push(`${finishedBao}包`);
+  const finishedQty = finishedParts.length ? finishedParts.join("+") : "0";
   const warehouseTotal = data.consultingProjects.length + data.consultingInteractions.length;
   const inventory = readLS<any[]>("sock-erp-inventory", []);
   const inventoryQty = inventory.reduce((s, i) => s + Number(i.quantity || 0), 0);
@@ -75,7 +80,7 @@ export function TodayPage() {
   const monthIncome = income.reduce((s, i) => s + Number(i.amount || 0), 0);
 
   const overviewCards = [
-    { label: "成品数量", value: `${finishedQty} 公斤`, color: "#3498db", icon: "📦" },
+    { label: "成品数量", value: finishedQty, color: "#3498db", icon: "📦" },
     { label: "仓库总量", value: `${warehouseTotal} 项`, color: "#2ecc71", icon: "🏭" },
     { label: "库存余量", value: `${inventoryQty} 件`, color: "#9b59b6", icon: "📊" },
     { label: "本月支出", value: `¥${monthExpense.toFixed(0)}`, color: "#e74c3c", icon: "💸" },

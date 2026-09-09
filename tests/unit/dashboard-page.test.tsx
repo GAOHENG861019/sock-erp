@@ -74,16 +74,16 @@ describe("首页总览", () => {
     const text = document.body.textContent || "";
     expect(text).toContain("¥50");
     expect(text).toContain("¥60");
-    expect(text).toContain("数量 10 公斤");
-    expect(text).toContain("数量 20 公斤");
-    expect(text).toContain("数量 15 公斤");
+    expect(text).toContain("数量 10双");
+    expect(text).toContain("数量 20双");
+    expect(text).toContain("数量 15双");
   });
 
   it("无数据时生产卡片显示0元", () => {
     renderDashboard();
     const text = document.body.textContent || "";
     expect(text).toContain("¥0");
-    expect(text).toContain("数量 0 公斤");
+    expect(text).toContain("数量 0");
   });
 
   it("显示生产数据总览标题", () => {

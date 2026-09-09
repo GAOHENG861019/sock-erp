@@ -72,6 +72,14 @@ export function DashboardPage() {
   const dingxing = readLS<any[]>("sock-erp-dingxing", []);
   const sumQty = (arr: any[]) => arr.reduce((s, i) => s + Number(i.quantity || 0), 0);
   const sumAmt = (arr: any[]) => arr.reduce((s, i) => s + Number(i.quantity || 0) * Number(i.unitPrice || 0), 0);
+  const fmtQty = (arr: any[]) => {
+    const shuang = arr.filter((i) => i.spec === "双").reduce((s, i) => s + Number(i.quantity || 0), 0);
+    const bao = arr.filter((i) => i.spec === "包").reduce((s, i) => s + Number(i.quantity || 0), 0);
+    const parts: string[] = [];
+    if (shuang) parts.push(`${shuang}双`);
+    if (bao) parts.push(`${bao}包`);
+    return parts.length ? parts.join("+") : "0";
+  };
   const warehouseCount = data.consultingProjects.length + data.consultingInteractions.length;
 
   return (
@@ -79,9 +87,9 @@ export function DashboardPage() {
       <PageHeader icon={<ModuleArtwork module="dashboard" />} eyebrow={new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(new Date())} title={`${new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(new Date())}，从重点开始`} description="今天的行动、提醒和业务状态都在这里。" actions={<Button onClick={() => navigate("/today?new=1")}><Plus size={17} />添加本月事项</Button>} />
       <Section title="生产数据总览" description="翻袜、缝头、定型累计金额与仓库余量">
         <div className="prod-overview-grid">
-          <div className="prod-overview-card" onClick={() => navigate("/fanwa")}><div className="pov-icon"><Factory size={22} /></div><span>翻袜</span><strong>¥{sumAmt(fanwa).toFixed(0)}</strong><small>数量 {sumQty(fanwa)} 公斤</small></div>
-          <div className="prod-overview-card" onClick={() => navigate("/fengtou")}><div className="pov-icon"><Factory size={22} /></div><span>缝头</span><strong>¥{sumAmt(fengtou).toFixed(0)}</strong><small>数量 {sumQty(fengtou)} 公斤</small></div>
-          <div className="prod-overview-card" onClick={() => navigate("/dingxing")}><div className="pov-icon"><Factory size={22} /></div><span>定型</span><strong>¥{sumAmt(dingxing).toFixed(0)}</strong><small>数量 {sumQty(dingxing)} 公斤</small></div>
+          <div className="prod-overview-card" onClick={() => navigate("/fanwa")}><div className="pov-icon"><Factory size={22} /></div><span>翻袜</span><strong>¥{sumAmt(fanwa).toFixed(0)}</strong><small>数量 {fmtQty(fanwa)}</small></div>
+          <div className="prod-overview-card" onClick={() => navigate("/fengtou")}><div className="pov-icon"><Factory size={22} /></div><span>缝头</span><strong>¥{sumAmt(fengtou).toFixed(0)}</strong><small>数量 {fmtQty(fengtou)}</small></div>
+          <div className="prod-overview-card" onClick={() => navigate("/dingxing")}><div className="pov-icon"><Factory size={22} /></div><span>定型</span><strong>¥{sumAmt(dingxing).toFixed(0)}</strong><small>数量 {fmtQty(dingxing)}</small></div>
           <div className="prod-overview-card" onClick={() => navigate("/consulting")}><div className="pov-icon"><Package size={22} /></div><span>仓库余量</span><strong>{warehouseCount}</strong><small>项目+出入库记录</small></div>
         </div>
       </Section>

@@ -58,7 +58,7 @@ describe("本月总览数据卡片", () => {
     ]));
     renderToday();
     const text = document.body.textContent || "";
-    expect(text).toContain("150 公斤");
+    expect(text).toContain("150双");
   });
 
   it("本月支出包含四类费用", () => {
@@ -83,7 +83,6 @@ describe("本月总览数据卡片", () => {
   it("无数据时显示0", () => {
     renderToday();
     const text = document.body.textContent || "";
-    expect(text).toContain("0 公斤");
     expect(text).toContain("¥0");
   });
 
