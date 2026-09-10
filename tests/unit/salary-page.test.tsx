@@ -36,7 +36,7 @@ describe("工资支出页面", () => {
   it("1. 渲染页面标题『工资支出』及描述", () => {
     render(<SalaryPage />);
     expect(screen.getByRole("heading", { level: 1, name: "工资支出" })).toBeInTheDocument();
-    expect(screen.getByText("关联翻袜、缝头、定型生产记录，按员工自动计算工资。")).toBeInTheDocument();
+    expect(screen.getByText("关联翻袜、缝头、定型生产记录，按员工自动计算工资。点击姓名查看每人每天产量。")).toBeInTheDocument();
     expect(screen.getByText("人工成本")).toBeInTheDocument();
   });
 

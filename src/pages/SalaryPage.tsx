@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash, Calculator, Users, Wallet } from "@phosphor-icons/react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Plus, Trash, Calculator, Users, Wallet, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { PageHeader, Section, Button, EmptyState, Modal } from "../components/ui";
 import { ModuleArtwork } from "../components/ModuleArtwork";
 
@@ -10,6 +10,7 @@ type ProductionItem = {
   spec: "包" | "双";
   quantity: number;
   unitPrice: number;
+  date?: string;
 };
 
 /** 定型生产记录（多一个颜色字段） */
@@ -34,6 +35,9 @@ type EmployeeRow = {
   dingxing: ProcessSummary;
   extra: number;
 };
+
+/** 每日产量明细行 */
+type DailyRow = { date: string; process: string; spec: string; quantity: number; amount: number; color?: string };
 
 const FANWA_KEY = "sock-erp-fanwa";
 const FENGTOU_KEY = "sock-erp-fengtou";
@@ -70,7 +74,7 @@ function totalOf(e: EmployeeRow): number {
   return e.fanwa.amount + e.fengtou.amount + e.dingxing.amount + e.extra;
 }
 
-/** 数量按规格分别显示：只有双 "100双"，只有包 "50包"，都有 "100双 + 50包"，都没有 "-" */
+/** 数量按规格分别显示 */
 function formatQty(s: ProcessSummary): string {
   const parts: string[] = [];
   if (s.shuang) parts.push(`${s.shuang}双`);
@@ -87,22 +91,14 @@ function ProcessCell({ summary }: { summary: ProcessSummary }) {
   );
 }
 
-/**
- * 工资支出页：
- * 1. 读取翻袜 / 缝头 / 定型三个生产数据源
- * 2. 按员工姓名分组，分别汇总三个工序的数量(双/包)与金额
- * 3. 员工工资合计 = 三工序金额 + 该员工名下额外工资
- * 4. 额外工资项（奖金、补贴）手动录入，存于 sock-erp-salary
- */
 export function SalaryPage() {
-  // 三个生产数据源在本页只读，挂载时读取一次
   const fanwaItems = useState<ProductionItem[]>(() => readJson(FANWA_KEY, []))[0];
   const fengtouItems = useState<ProductionItem[]>(() => readJson(FENGTOU_KEY, []))[0];
   const dingxingItems = useState<DingxingItem[]>(() => readJson(DINGXING_KEY, []))[0];
-  // 额外工资项可增删，需要持久化
   const [extras, setExtras] = useLocalStorage<ExtraSalary[]>(SALARY_KEY, []);
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [expandedName, setExpandedName] = useState<string | null>(null);
   const [draft, setDraft] = useState<ExtraSalary>({
     id: "", name: "", amount: 0, note: "",
     date: new Date().toISOString().slice(0, 10),
@@ -140,7 +136,6 @@ export function SalaryPage() {
       else if (it.spec === "包") s.bao += Number(it.quantity) || 0;
       s.amount += (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0);
     }
-    // 额外工资计入同名员工；无同名生产记录的员工也单独成行
     for (const ex of extras) {
       get(ex.name).extra += Number(ex.amount) || 0;
     }
@@ -148,6 +143,31 @@ export function SalaryPage() {
   }, [fanwaItems, fengtouItems, dingxingItems, extras]);
 
   const grandTotal = useMemo(() => employees.reduce((s, e) => s + totalOf(e), 0), [employees]);
+
+  // 获取某员工的每日产量明细
+  const dailyRecords = useMemo<DailyRow[]>(() => {
+    if (!expandedName) return [];
+    const rows: DailyRow[] = [];
+    fanwaItems.filter((i) => i.name === expandedName).forEach((i) => {
+      rows.push({ date: i.date || "无日期", process: "翻袜", spec: i.spec, quantity: Number(i.quantity) || 0, amount: (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0) });
+    });
+    fengtouItems.filter((i) => i.name === expandedName).forEach((i) => {
+      rows.push({ date: i.date || "无日期", process: "缝头", spec: i.spec, quantity: Number(i.quantity) || 0, amount: (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0) });
+    });
+    dingxingItems.filter((i) => i.name === expandedName).forEach((i) => {
+      rows.push({ date: i.date || "无日期", process: "定型", spec: i.spec, quantity: Number(i.quantity) || 0, amount: (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), color: i.color });
+    });
+    return rows.sort((a, b) => b.date.localeCompare(a.date));
+  }, [expandedName, fanwaItems, fengtouItems, dingxingItems]);
+
+  // 按日期分组
+  const dailyByDate = useMemo(() => {
+    const groups: Record<string, DailyRow[]> = {};
+    dailyRecords.forEach((r) => {
+      (groups[r.date] ??= []).push(r);
+    });
+    return groups;
+  }, [dailyRecords]);
 
   const resetDraft = () => setDraft({ id: "", name: "", amount: 0, note: "", date: new Date().toISOString().slice(0, 10) });
 
@@ -166,7 +186,7 @@ export function SalaryPage() {
         icon={<ModuleArtwork module="fitness" />}
         eyebrow="人工成本"
         title="工资支出"
-        description="关联翻袜、缝头、定型生产记录，按员工自动计算工资。"
+        description="关联翻袜、缝头、定型生产记录，按员工自动计算工资。点击姓名查看每人每天产量。"
         actions={<Button onClick={() => setModalOpen(true)}><Plus size={16} />添加额外工资</Button>}
       />
 
@@ -182,20 +202,63 @@ export function SalaryPage() {
       </div>
 
       {employees.length ? (
-        <Section title="员工工资明细" description="按工资合计降序排列，三工序数量按双/包分别汇总">
+        <Section title="员工工资明细" description="按工资合计降序排列，点击姓名展开查看每日产量">
           <table className="prod-table">
             <thead>
               <tr><th>姓名</th><th>翻袜</th><th>缝头</th><th>定型</th><th>工资合计</th></tr>
             </thead>
             <tbody>
               {employees.map((e) => (
-                <tr key={e.name}>
-                  <td><strong>{e.name}</strong></td>
-                  <ProcessCell summary={e.fanwa} />
-                  <ProcessCell summary={e.fengtou} />
-                  <ProcessCell summary={e.dingxing} />
-                  <td><strong>¥{totalOf(e).toFixed(2)}</strong></td>
-                </tr>
+                <Fragment key={e.name}>
+                  <tr style={{ cursor: "pointer" }} onClick={() => setExpandedName(expandedName === e.name ? null : e.name)}>
+                    <td>
+                      <strong style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        {expandedName === e.name ? <CaretDown size={14} /> : <CaretRight size={14} />}
+                        {e.name}
+                      </strong>
+                    </td>
+                    <ProcessCell summary={e.fanwa} />
+                    <ProcessCell summary={e.fengtou} />
+                    <ProcessCell summary={e.dingxing} />
+                    <td><strong>¥{totalOf(e).toFixed(2)}</strong></td>
+                  </tr>
+                  {expandedName === e.name && (
+                    <tr>
+                      <td colSpan={5} style={{ background: "#f9f9f9", padding: 0 }}>
+                        <div style={{ padding: "12px 16px" }}>
+                          <h4 style={{ margin: "0 0 8px", fontSize: 14, color: "#333" }}>{e.name} 的每日产量</h4>
+                          {Object.keys(dailyByDate).length ? (
+                            Object.entries(dailyByDate).map(([date, rows]) => {
+                              const dayTotal = rows.reduce((s, r) => s + r.amount, 0);
+                              const dayQty = rows.reduce((s, r) => s + r.quantity, 0);
+                              return (
+                                <div key={date} style={{ marginBottom: 12 }}>
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 4 }}>
+                                    {date} — 共 {dayQty} {rows[0]?.spec || "包"}，¥{dayTotal.toFixed(2)}
+                                  </div>
+                                  <table className="prod-table" style={{ fontSize: 12 }}>
+                                    <thead><tr><th>工序</th><th>规格</th><th>数量</th><th>金额</th>{rows.some(r => r.color) ? <th>颜色</th> : null}</tr></thead>
+                                    <tbody>
+                                      {rows.map((r, idx) => (
+                                        <tr key={idx}>
+                                          <td>{r.process}</td>
+                                          <td>{r.spec}</td>
+                                          <td>{r.quantity} {r.spec}</td>
+                                          <td>¥{r.amount.toFixed(2)}</td>
+                                          {rows.some(r => r.color) ? <td>{r.color || "-"}</td> : null}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              );
+                            })
+                          ) : <p style={{ color: "#999", fontSize: 13 }}>暂无产量记录</p>}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>

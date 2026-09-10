@@ -9,6 +9,7 @@ export type ProductionItem = {
   spec: "包" | "双";
   quantity: number;
   unitPrice: number;
+  date?: string;
 };
 
 const COLORS = ["白色", "黑色", "灰色", "红色", "蓝色", "绿色", "黄色", "粉色", "紫色", "肤色"];
@@ -57,7 +58,7 @@ export function ProductionRecordPage({
   storageKey: string;
 }) {
   const [items, setItems] = useLocalStorage<ProductionItem[]>(storageKey, []);
-  const [draft, setDraft] = useState<ProductionItem>({ id: "", name: "", spec: "包", quantity: 0, unitPrice: 0 });
+  const [draft, setDraft] = useState<ProductionItem>({ id: "", name: "", spec: "包", quantity: 0, unitPrice: 0, date: new Date().toISOString().slice(0, 10) });
   const [editing, setEditing] = useState<ProductionItem | null>(null);
 
   const nameGroups = useMemo(() => {
@@ -73,7 +74,7 @@ export function ProductionRecordPage({
   const addItem = () => {
     if (!draft.name.trim()) return;
     setItems((prev) => [...prev, { ...draft, id: genId() }]);
-    setDraft({ id: "", name: "", spec: "包", quantity: 0, unitPrice: 0 });
+    setDraft({ id: "", name: "", spec: "包", quantity: 0, unitPrice: 0, date: new Date().toISOString().slice(0, 10) });
   };
 
   const removeItem = (id: string) => setItems((prev) => prev.filter((item) => item.id !== id));
@@ -87,8 +88,9 @@ export function ProductionRecordPage({
   return (
     <div>
       <PageHeader icon={<ModuleArtwork module={module} />} eyebrow={eyebrow} title={title} description={description} />
-      <Section title="录入记录" description="填写姓名、规格(双/包)、数量和单价，合计自动计算">
+      <Section title="录入记录" description="填写日期、姓名、规格(双/包)、数量和单价，合计自动计算">
         <div className="production-input-row">
+          <input className="prod-input" type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
           <input className="prod-input" placeholder="姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <select className="prod-input" value={draft.spec} onChange={(e) => setDraft({ ...draft, spec: e.target.value as "包" | "双" })}>
             <option value="包">包</option>
@@ -107,10 +109,11 @@ export function ProductionRecordPage({
             return (
               <Section key={name} title={`姓名：${name}`} description={`${nameItems.length} 条记录`}>
                 <table className="prod-table">
-                  <thead><tr><th>规格</th><th>数量</th><th>单价</th><th>合计</th><th>操作</th></tr></thead>
+                  <thead><tr><th>日期</th><th>规格</th><th>数量</th><th>单价</th><th>合计</th><th>操作</th></tr></thead>
                   <tbody>
                     {nameItems.map((item) => (
                       <tr key={item.id}>
+                        <td>{item.date || "-"}</td>
                         <td>{item.spec}</td>
                         <td>{item.quantity} {item.spec}</td>
                         <td>¥{item.unitPrice.toFixed(2)}/{item.spec}</td>
@@ -139,6 +142,7 @@ export function ProductionRecordPage({
       <Modal open={editing !== null} onClose={() => setEditing(null)} title="编辑记录">
         {editing && (
           <div className="form-grid">
+            <label className="form-field"><span>日期</span><input type="date" value={editing.date || ""} onChange={(e) => setEditing({ ...editing, date: e.target.value })} /></label>
             <label className="form-field"><span>姓名</span><input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></label>
             <label className="form-field"><span>规格</span>
               <select value={editing.spec} onChange={(e) => setEditing({ ...editing, spec: e.target.value as "包" | "双" })}>
@@ -163,7 +167,7 @@ export function ProductionRecordPage({
 /** 定型页：按颜色分组，每个颜色单独合计，数量按规格(双/包)计算 */
 export function DingxingPage({ module }: { module: ModuleArtworkName }) {
   const [items, setItems] = useLocalStorage<(ProductionItem & { color: string })[]>("sock-erp-dingxing", []);
-  const [draft, setDraft] = useState<ProductionItem & { color: string }>({ id: "", name: "", color: "白色", spec: "包", quantity: 0, unitPrice: 0 });
+  const [draft, setDraft] = useState<ProductionItem & { color: string }>({ id: "", name: "", color: "白色", spec: "包", quantity: 0, unitPrice: 0, date: new Date().toISOString().slice(0, 10) });
   const [customColor, setCustomColor] = useState("");
   const [editing, setEditing] = useState<(ProductionItem & { color: string }) | null>(null);
 
@@ -180,7 +184,7 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
   const addItem = () => {
     if (!draft.name.trim()) return;
     setItems((prev) => [...prev, { ...draft, id: genId() }]);
-    setDraft({ id: "", name: "", color: "白色", spec: "包", quantity: 0, unitPrice: 0 });
+    setDraft({ id: "", name: "", color: "白色", spec: "包", quantity: 0, unitPrice: 0, date: new Date().toISOString().slice(0, 10) });
   };
 
   const removeItem = (id: string) => setItems((prev) => prev.filter((item) => item.id !== id));
@@ -196,8 +200,9 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
   return (
     <div>
       <PageHeader icon={<ModuleArtwork module={module} />} eyebrow="生产工序" title="定型" description="按颜色分组记录定型数量，每个颜色单独合计，数量按规格(双/包)计算。" />
-      <Section title="录入记录" description="选择颜色或姓名，填写规格(双/包)、数量和单价">
+      <Section title="录入记录" description="选择颜色或姓名，填写日期、规格(双/包)、数量和单价">
         <div className="production-input-row">
+          <input className="prod-input" type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
           <input className="prod-input" placeholder="姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <select className="prod-input" value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })}>
             {allColors.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -219,10 +224,11 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
             return (
               <Section key={color} title={`颜色：${color}`} description={`${colorItems.length} 条记录`}>
                 <table className="prod-table">
-                  <thead><tr><th>姓名</th><th>规格</th><th>数量</th><th>单价</th><th>合计</th><th>操作</th></tr></thead>
+                  <thead><tr><th>日期</th><th>姓名</th><th>规格</th><th>数量</th><th>单价</th><th>合计</th><th>操作</th></tr></thead>
                   <tbody>
                     {colorItems.map((item) => (
                       <tr key={item.id}>
+                        <td>{item.date || "-"}</td>
                         <td>{item.name}</td>
                         <td>{item.spec}</td>
                         <td>{item.quantity} {item.spec}</td>
@@ -252,6 +258,7 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
       <Modal open={editing !== null} onClose={() => setEditing(null)} title="编辑定型记录">
         {editing && (
           <div className="form-grid">
+            <label className="form-field"><span>日期</span><input type="date" value={editing.date || ""} onChange={(e) => setEditing({ ...editing, date: e.target.value })} /></label>
             <label className="form-field"><span>姓名</span><input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></label>
             <label className="form-field"><span>颜色</span>
               <select value={editing.color} onChange={(e) => setEditing({ ...editing, color: e.target.value })}>
