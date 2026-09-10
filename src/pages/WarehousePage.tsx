@@ -158,6 +158,19 @@ export function WarehousePage() {
     return groups;
   }, [currentList, activeTab, dingxingList, rawMaterialList]);
 
+  // 成品按颜色汇总（合并不同规格）
+  const balanceByColor = useMemo(() => {
+    const groups: Record<string, { packages: number; weightKg: number; specs: string[] }> = {};
+    Object.entries(balanceByColorSpec).forEach(([key, val]) => {
+      const [color, spec] = key.split("|");
+      if (!groups[color]) groups[color] = { packages: 0, weightKg: 0, specs: [] };
+      groups[color].packages += val.packages;
+      groups[color].weightKg += val.weightKg;
+      if (val.packages !== 0 || val.weightKg !== 0) groups[color].specs.push(spec);
+    });
+    return groups;
+  }, [balanceByColorSpec]);
+
   const totalPackages = Object.values(balanceByColorSpec).reduce((s, v) => s + v.packages, 0);
   const totalWeightKg = Object.values(balanceByColorSpec).reduce((s, v) => s + v.weightKg, 0);
 
@@ -259,26 +272,44 @@ export function WarehousePage() {
         </button>
       </div>
 
-      {/* 库存余量按颜色+规格汇总 */}
-      <Section title={isFinished ? "成品库存余量（按颜色和规格）" : "原材料库存余量（按名称和规格）"} description="入库减出库后的当前余量，上面包数下面公斤数">
-        {Object.keys(balanceByColorSpec).length ? (
-          <div className="prod-overview-grid">
-            {Object.entries(balanceByColorSpec).map(([key, val]) => {
-              const [color, spec] = key.split("|");
-              return (
-                <div key={key} className="prod-overview-card">
-                  <div className="pov-icon" style={{ background: isFinished ? "#3498db20" : "#f39c1220", color: isFinished ? "#3498db" : "#f39c12" }}>
-                    {isFinished ? <Package size={22} /> : <Cube size={22} />}
+      {/* 库存余量：成品按颜色汇总，原材料按名称+规格 */}
+      <Section title={isFinished ? "成品库存余量（按颜色）" : "原材料库存余量（按名称和规格）"} description="入库减出库后的当前余量，上面包数下面公斤数">
+        {isFinished ? (
+          Object.keys(balanceByColor).length ? (
+            <div className="prod-overview-grid">
+              {Object.entries(balanceByColor).map(([color, val]) => (
+                <div key={color} className="prod-overview-card">
+                  <div className="pov-icon" style={{ background: "#3498db20", color: "#3498db" }}>
+                    <Package size={22} />
                   </div>
                   <span>{color}</span>
                   <strong>{val.packages}包</strong>
                   <small>{val.weightKg}公斤</small>
-                  <small className="pov-breakdown">规格：{spec}</small>
+                  <small className="pov-breakdown">规格：{val.specs.join("、") || "无"}</small>
                 </div>
-              );
-            })}
-          </div>
-        ) : <p className="quiet-line">暂无库存记录</p>}
+              ))}
+            </div>
+          ) : <p className="quiet-line">暂无库存记录</p>
+        ) : (
+          Object.keys(balanceByColorSpec).length ? (
+            <div className="prod-overview-grid">
+              {Object.entries(balanceByColorSpec).map(([key, val]) => {
+                const [name, spec] = key.split("|");
+                return (
+                  <div key={key} className="prod-overview-card">
+                    <div className="pov-icon" style={{ background: "#f39c1220", color: "#f39c12" }}>
+                      <Cube size={22} />
+                    </div>
+                    <span>{name}</span>
+                    <strong>{val.packages}包</strong>
+                    <small>{val.weightKg}公斤</small>
+                    <small className="pov-breakdown">规格：{spec}</small>
+                  </div>
+                );
+              })}
+            </div>
+          ) : <p className="quiet-line">暂无库存记录</p>
+        )}
         <div className="prod-summary prod-grand">
           <span><Calculator size={18} />当前总余量：<strong>{totalPackages}包 / {totalWeightKg}公斤</strong></span>
         </div>
