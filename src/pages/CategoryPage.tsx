@@ -29,6 +29,17 @@ type RawMaterialRecord = {
   weight?: number;
   unitPrice?: number;
   amount?: number;
+  packages?: number;
+};
+
+type WarehouseItem = {
+  id: string;
+  linkedId: string;
+  quantity: number;
+  packages?: number;
+  weightKg?: number;
+  type: "in" | "out";
+  date?: string;
 };
 
 type CategoryType = "product" | "material";
@@ -77,6 +88,36 @@ function readRawMaterials(): RawMaterialRecord[] {
   return readJsonArray<RawMaterialRecord>("sock-erp-raw-materials");
 }
 
+function readFinishedInventory(): WarehouseItem[] {
+  return readJsonArray<WarehouseItem>("sock-erp-finished-inventory");
+}
+
+function readMaterialInventory(): WarehouseItem[] {
+  return readJsonArray<WarehouseItem>("sock-erp-material-inventory");
+}
+
+function calcFinishedBalance(items: WarehouseItem[]): Record<string, { packages: number; weightKg: number }> {
+  const balance: Record<string, { packages: number; weightKg: number }> = {};
+  items.forEach((item) => {
+    if (!balance[item.linkedId]) balance[item.linkedId] = { packages: 0, weightKg: 0 };
+    const sign = item.type === "out" ? -1 : 1;
+    balance[item.linkedId].packages += sign * Number(item.quantity || 0);
+    balance[item.linkedId].weightKg += sign * Number(item.weightKg || 0);
+  });
+  return balance;
+}
+
+function calcMaterialBalance(items: WarehouseItem[]): Record<string, { packages: number; weightKg: number }> {
+  const balance: Record<string, { packages: number; weightKg: number }> = {};
+  items.forEach((item) => {
+    if (!balance[item.linkedId]) balance[item.linkedId] = { packages: 0, weightKg: 0 };
+    const sign = item.type === "out" ? -1 : 1;
+    balance[item.linkedId].packages += sign * Number(item.packages || 0);
+    balance[item.linkedId].weightKg += sign * Number(item.quantity || 0);
+  });
+  return balance;
+}
+
 function genId() {
   return `cat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -105,6 +146,10 @@ export function CategoryPage() {
   // 关联数据源：定型数据（商品分类关联）与原材料采购数据（原材料分类关联）
   const dingxingList = useMemo(() => readDingxing(), []);
   const rawMaterialList = useMemo(() => readRawMaterials(), []);
+  const finishedInventory = useMemo(() => readFinishedInventory(), []);
+  const materialInventory = useMemo(() => readMaterialInventory(), []);
+  const finishedBalance = useMemo(() => calcFinishedBalance(finishedInventory), [finishedInventory]);
+  const materialBalance = useMemo(() => calcMaterialBalance(materialInventory), [materialInventory]);
 
   const dingxingOptions = useMemo(
     () => [
@@ -133,10 +178,16 @@ export function CategoryPage() {
     if (!cat.linkedId) return null;
     if (activeType === "product") {
       const d = dingxingList.find((x) => x.id === cat.linkedId);
-      return d ? `${d.color ?? ""} / ${d.spec ?? ""}` : null;
+      const bal = finishedBalance[cat.linkedId];
+      const base = d ? `${d.color ?? ""} / ${d.spec ?? ""}` : "关联已删除";
+      if (bal) return `${base} | 库存：${bal.packages}包 / ${bal.weightKg}公斤`;
+      return base;
     }
     const r = rawMaterialList.find((x) => x.id === cat.linkedId);
-    return r ? r.name ?? null : null;
+    const bal = materialBalance[cat.linkedId];
+    const base = r ? r.name ?? "" : "关联已删除";
+    if (bal) return `${base} | 库存：${bal.packages}包 / ${bal.weightKg}公斤`;
+    return base;
   }
 
   function updateList(type: CategoryType, list: Category[]) {
@@ -247,7 +298,7 @@ export function CategoryPage() {
         icon={<ModuleArtwork module="fitness" />}
         eyebrow="基础数据"
         title="分类中心"
-        description="维护商品分类和原材料分类，序号自动排列，支持拖拽排序。"
+        description="维护商品分类和原材料分类，关联仓库库存，序号自动排列，支持拖拽排序。"
         actions={
           <Button onClick={openAdd}><Plus size={17} />添加{TYPE_META[activeType].label}</Button>
         }

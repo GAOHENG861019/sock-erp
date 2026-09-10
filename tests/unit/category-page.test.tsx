@@ -316,4 +316,39 @@ describe("分类中心页面", () => {
     const materialSelect = within(modal).getByLabelText(/关联原材料/) as HTMLSelectElement;
     expect(within(materialSelect).getByText("3075纱线 - 18D")).toBeInTheDocument();
   });
+
+  it("原材料分类显示关联仓库的包数和公斤数", () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "rm1", name: "3075纱线", spec: "18D", weight: 100, unitPrice: 20, amount: 2000, packages: 10 },
+    ]));
+    window.localStorage.setItem("sock-erp-material-inventory", JSON.stringify([
+      { id: "mi1", linkedId: "rm1", quantity: 100, packages: 10, type: "in", date: "2024-01-01" },
+      { id: "mi2", linkedId: "rm1", quantity: 20, packages: 2, type: "out", date: "2024-01-02" },
+    ]));
+    window.localStorage.setItem("sock-erp-material-categories", JSON.stringify([
+      { id: "c1", name: "纱线类", description: "", sortOrder: 1, createdAt: "2024-01-01", linkedId: "rm1" },
+    ]));
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: /原材料分类/ }));
+    const text = document.body.textContent || "";
+    // 10-2=8包, 100-20=80公斤
+    expect(text).toContain("8包");
+    expect(text).toContain("80公斤");
+  });
+
+  it("商品分类显示关联仓库成品的包数和公斤数", () => {
+    window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
+      { id: "dx1", name: "张三", color: "白色", spec: "包", quantity: 100, unitPrice: 5 },
+    ]));
+    window.localStorage.setItem("sock-erp-finished-inventory", JSON.stringify([
+      { id: "fi1", linkedId: "dx1", quantity: 50, weightKg: 100, type: "in", date: "2024-01-01" },
+    ]));
+    window.localStorage.setItem("sock-erp-product-categories", JSON.stringify([
+      { id: "c1", name: "棉袜", description: "", sortOrder: 1, createdAt: "2024-01-01", linkedId: "dx1" },
+    ]));
+    renderPage();
+    const text = document.body.textContent || "";
+    expect(text).toContain("50包");
+    expect(text).toContain("100公斤");
+  });
 });
