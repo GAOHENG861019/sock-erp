@@ -25,6 +25,15 @@ type RawMaterialItem = {
   amount: number;
 };
 
+type ProductionItem = {
+  id: string;
+  name: string;
+  spec: string;
+  quantity: number;
+  unitPrice: number;
+  date?: string;
+};
+
 export function DietPage() {
   const { data, run, saveNow } = useWorkspace();
   const [params, setParams] = useSearchParams();
@@ -42,6 +51,48 @@ export function DietPage() {
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
   }, []);
+
+  const fanwa = useMemo<ProductionItem[]>(() => {
+    try { const raw = localStorage.getItem("sock-erp-fanwa"); return raw ? JSON.parse(raw) : []; } catch { return []; }
+  }, []);
+
+  const fengtou = useMemo<ProductionItem[]>(() => {
+    try { const raw = localStorage.getItem("sock-erp-fengtou"); return raw ? JSON.parse(raw) : []; } catch { return []; }
+  }, []);
+
+  // 翻袜按姓名分组
+  const fanwaByName = useMemo(() => {
+    const groups: Record<string, ProductionItem[]> = {};
+    fanwa.forEach((item) => {
+      const key = item.name || "未分组";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+    return groups;
+  }, [fanwa]);
+
+  // 缝头按姓名分组
+  const fengtouByName = useMemo(() => {
+    const groups: Record<string, ProductionItem[]> = {};
+    fengtou.forEach((item) => {
+      const key = item.name || "未分组";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+    return groups;
+  }, [fengtou]);
+
+  const fanwaTotal = useMemo(() => {
+    let qty = 0; let amount = 0;
+    fanwa.forEach((i) => { qty += Number(i.quantity || 0); amount += Number(i.quantity || 0) * Number(i.unitPrice || 0); });
+    return { qty, amount };
+  }, [fanwa]);
+
+  const fengtouTotal = useMemo(() => {
+    let qty = 0; let amount = 0;
+    fengtou.forEach((i) => { qty += Number(i.quantity || 0); amount += Number(i.quantity || 0) * Number(i.unitPrice || 0); });
+    return { qty, amount };
+  }, [fengtou]);
 
   // 成品按颜色分组
   const dingxingByColor = useMemo(() => {
@@ -148,6 +199,84 @@ export function DietPage() {
         ) : (
           <EmptyState title="暂无成品库存数据" description="完成定型登记后，此处会按颜色汇总成品库存。" />
         )}
+      </Section>
+
+      <Section title="翻袜库存（关联翻袜）" description="按姓名汇总翻袜生产数据">
+        {fanwa.length ? (
+          <div className="finished-group-list">
+            {Object.entries(fanwaByName).map(([name, list]) => {
+              const qty = list.reduce((s, i) => s + Number(i.quantity || 0), 0);
+              const amount = list.reduce((s, i) => s + Number(i.quantity || 0) * Number(i.unitPrice || 0), 0);
+              return (
+                <div key={name} className="finished-color-group">
+                  <div className="finished-color-head">
+                    <strong className="finished-color-name">{name}</strong>
+                    <span className="finished-color-summary">{qty}件 · 小计 ¥{amount.toFixed(2)}</span>
+                  </div>
+                  <table className="prod-table">
+                    <thead><tr><th>规格</th><th>数量</th><th>单价</th><th>合计金额</th></tr></thead>
+                    <tbody>
+                      {list.map((item) => {
+                        const sub = Number(item.quantity || 0) * Number(item.unitPrice || 0);
+                        return (
+                          <tr key={item.id}>
+                            <td>{item.spec}</td>
+                            <td>{item.quantity}</td>
+                            <td>¥{Number(item.unitPrice || 0).toFixed(2)}</td>
+                            <td>¥{sub.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+            <div className="finished-grand-total">
+              <strong>翻袜总计：</strong>
+              <span>总数量 {fanwaTotal.qty} · 总金额 ¥{fanwaTotal.amount.toFixed(2)}</span>
+            </div>
+          </div>
+        ) : <EmptyState title="暂无翻袜库存数据" description="登记翻袜生产后，此处会按姓名汇总翻袜库存。" />}
+      </Section>
+
+      <Section title="缝头库存（关联缝头）" description="按姓名汇总缝头生产数据">
+        {fengtou.length ? (
+          <div className="finished-group-list">
+            {Object.entries(fengtouByName).map(([name, list]) => {
+              const qty = list.reduce((s, i) => s + Number(i.quantity || 0), 0);
+              const amount = list.reduce((s, i) => s + Number(i.quantity || 0) * Number(i.unitPrice || 0), 0);
+              return (
+                <div key={name} className="finished-color-group">
+                  <div className="finished-color-head">
+                    <strong className="finished-color-name">{name}</strong>
+                    <span className="finished-color-summary">{qty}件 · 小计 ¥{amount.toFixed(2)}</span>
+                  </div>
+                  <table className="prod-table">
+                    <thead><tr><th>规格</th><th>数量</th><th>单价</th><th>合计金额</th></tr></thead>
+                    <tbody>
+                      {list.map((item) => {
+                        const sub = Number(item.quantity || 0) * Number(item.unitPrice || 0);
+                        return (
+                          <tr key={item.id}>
+                            <td>{item.spec}</td>
+                            <td>{item.quantity}</td>
+                            <td>¥{Number(item.unitPrice || 0).toFixed(2)}</td>
+                            <td>¥{sub.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+            <div className="finished-grand-total">
+              <strong>缝头总计：</strong>
+              <span>总数量 {fengtouTotal.qty} · 总金额 ¥{fengtouTotal.amount.toFixed(2)}</span>
+            </div>
+          </div>
+        ) : <EmptyState title="暂无缝头库存数据" description="登记缝头生产后，此处会按姓名汇总缝头库存。" />}
       </Section>
 
       <Section title="原材料库存（关联原材料采购）" description="按名称与规格汇总原材料采购数据">

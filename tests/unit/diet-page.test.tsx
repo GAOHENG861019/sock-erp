@@ -136,4 +136,33 @@ describe("库存盘点页面", () => {
     expect(text).toContain("总重量 15");
     expect(text).toContain("¥550.00");
   });
+
+  it("翻袜库存关联翻袜数据按姓名显示", () => {
+    window.localStorage.setItem("sock-erp-fanwa", JSON.stringify([
+      { id: "1", name: "张三", spec: "包", quantity: 50, unitPrice: 3 },
+      { id: "2", name: "李四", spec: "双", quantity: 100, unitPrice: 1 },
+    ]));
+    renderPage();
+    const text = document.body.textContent || "";
+    expect(text).toContain("翻袜库存");
+    expect(text).toContain("张三");
+    expect(text).toContain("李四");
+    expect(text).toContain("翻袜总计");
+    // 总数量 = 50 + 100 = 150, 总金额 = 50*3 + 100*1 = 250
+    expect(text).toContain("总数量 150");
+    expect(text).toContain("¥250.00");
+  });
+
+  it("缝头库存关联缝头数据按姓名显示", () => {
+    window.localStorage.setItem("sock-erp-fengtou", JSON.stringify([
+      { id: "1", name: "王五", spec: "包", quantity: 30, unitPrice: 4 },
+    ]));
+    renderPage();
+    const text = document.body.textContent || "";
+    expect(text).toContain("缝头库存");
+    expect(text).toContain("王五");
+    expect(text).toContain("缝头总计");
+    expect(text).toContain("总数量 30");
+    expect(text).toContain("¥120.00");
+  });
 });
