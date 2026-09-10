@@ -28,6 +28,8 @@ type InventoryItem = {
   id: string;
   linkedId: string;
   quantity: number;
+  packages?: number;
+  weightKg?: number;
   note: string;
   type: TxnType;
   date: string;
@@ -83,6 +85,8 @@ export function WarehousePage() {
 
   const [formLinkedId, setFormLinkedId] = useState("");
   const [formQuantity, setFormQuantity] = useState("");
+  const [formPackages, setFormPackages] = useState("");
+  const [formWeightKg, setFormWeightKg] = useState("");
   const [formNote, setFormNote] = useState("");
   const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10));
 
@@ -127,24 +131,35 @@ export function WarehousePage() {
     return r?.spec || "未分类";
   }
 
-  // 按颜色+规格计算当前库存余量
+  function getItemPackages(tab: TabKey, item: InventoryItem): number {
+    if (tab === "finished") return Number(item.quantity || 0);
+    return Number(item.packages || 0);
+  }
+
+  function getItemWeightKg(tab: TabKey, item: InventoryItem): number {
+    if (tab === "finished") return Number(item.weightKg || 0);
+    return Number(item.quantity || 0);
+  }
+
+  // 按颜色+规格计算当前库存余量（包数和公斤数）
   const balanceByColorSpec = useMemo(() => {
-    const groups: Record<string, number> = {};
+    const groups: Record<string, { packages: number; weightKg: number }> = {};
     currentList.forEach((item) => {
       const color = getColor(activeTab, item.linkedId);
       const spec = getSpec(activeTab, item.linkedId);
       const key = `${color}|${spec}`;
-      const qty = Number(item.quantity || 0);
-      if (item.type === "out") {
-        groups[key] = (groups[key] || 0) - qty;
-      } else {
-        groups[key] = (groups[key] || 0) + qty;
-      }
+      const pkgs = getItemPackages(activeTab, item);
+      const kg = getItemWeightKg(activeTab, item);
+      const sign = item.type === "out" ? -1 : 1;
+      if (!groups[key]) groups[key] = { packages: 0, weightKg: 0 };
+      groups[key].packages += sign * pkgs;
+      groups[key].weightKg += sign * kg;
     });
     return groups;
   }, [currentList, activeTab, dingxingList, rawMaterialList]);
 
-  const totalBalance = Object.values(balanceByColorSpec).reduce((s, v) => s + v, 0);
+  const totalPackages = Object.values(balanceByColorSpec).reduce((s, v) => s + v.packages, 0);
+  const totalWeightKg = Object.values(balanceByColorSpec).reduce((s, v) => s + v.weightKg, 0);
 
   function updateList(tab: TabKey, list: InventoryItem[]) {
     if (tab === "finished") setFinishedList(list);
@@ -156,6 +171,8 @@ export function WarehousePage() {
     setTxnType(type);
     setFormLinkedId("");
     setFormQuantity("");
+    setFormPackages("");
+    setFormWeightKg("");
     setFormNote("");
     setFormDate(new Date().toISOString().slice(0, 10));
     setModalOpen(true);
@@ -166,6 +183,8 @@ export function WarehousePage() {
     setTxnType(item.type || "in");
     setFormLinkedId(item.linkedId);
     setFormQuantity(String(item.quantity));
+    setFormPackages(String(item.packages ?? ""));
+    setFormWeightKg(String(item.weightKg ?? ""));
     setFormNote(item.note);
     setFormDate(item.date || new Date().toISOString().slice(0, 10));
     setModalOpen(true);
@@ -176,12 +195,14 @@ export function WarehousePage() {
     if (!formLinkedId) return;
     const list = activeTab === "finished" ? [...finishedList] : [...materialList];
     const quantity = Number(formQuantity) || 0;
+    const packages = Number(formPackages) || 0;
+    const weightKg = Number(formWeightKg) || 0;
     const note = formNote.trim();
     if (editing) {
       const idx = list.findIndex((i) => i.id === editing.id);
-      if (idx >= 0) list[idx] = { ...list[idx], linkedId: formLinkedId, quantity, note, type: txnType, date: formDate };
+      if (idx >= 0) list[idx] = { ...list[idx], linkedId: formLinkedId, quantity, packages, weightKg, note, type: txnType, date: formDate };
     } else {
-      list.push({ id: genId(), linkedId: formLinkedId, quantity, note, type: txnType, date: formDate });
+      list.push({ id: genId(), linkedId: formLinkedId, quantity, packages, weightKg, note, type: txnType, date: formDate });
     }
     updateList(activeTab, list);
     setModalOpen(false);
@@ -196,7 +217,6 @@ export function WarehousePage() {
   }
 
   const isFinished = activeTab === "finished";
-  const unit = isFinished ? "包" : "公斤";
   const options = isFinished
     ? dingxingList.map((d) => ({ value: d.id, label: `${d.color ?? ""} - ${d.spec ?? ""} - ${d.name ?? ""}` }))
     : rawMaterialList.map((r) => ({ value: r.id, label: `${r.name ?? ""} - ${r.spec ?? ""}` }));
@@ -240,10 +260,10 @@ export function WarehousePage() {
       </div>
 
       {/* 库存余量按颜色+规格汇总 */}
-      <Section title={isFinished ? "成品库存余量（按颜色和规格）" : "原材料库存余量（按名称和规格）"} description="入库减出库后的当前余量">
+      <Section title={isFinished ? "成品库存余量（按颜色和规格）" : "原材料库存余量（按名称和规格）"} description="入库减出库后的当前余量，上面包数下面公斤数">
         {Object.keys(balanceByColorSpec).length ? (
           <div className="prod-overview-grid">
-            {Object.entries(balanceByColorSpec).map(([key, qty]) => {
+            {Object.entries(balanceByColorSpec).map(([key, val]) => {
               const [color, spec] = key.split("|");
               return (
                 <div key={key} className="prod-overview-card">
@@ -251,15 +271,16 @@ export function WarehousePage() {
                     {isFinished ? <Package size={22} /> : <Cube size={22} />}
                   </div>
                   <span>{color}</span>
-                  <strong>{qty}{unit}</strong>
-                  <small>规格：{spec}</small>
+                  <strong>{val.packages}包</strong>
+                  <small>{val.weightKg}公斤</small>
+                  <small className="pov-breakdown">规格：{spec}</small>
                 </div>
               );
             })}
           </div>
         ) : <p className="quiet-line">暂无库存记录</p>}
         <div className="prod-summary prod-grand">
-          <span><Calculator size={18} />当前总余量：<strong>{totalBalance} {unit}</strong></span>
+          <span><Calculator size={18} />当前总余量：<strong>{totalPackages}包 / {totalWeightKg}公斤</strong></span>
         </div>
       </Section>
 
@@ -282,8 +303,9 @@ export function WarehousePage() {
                   <th>{isFinished ? "颜色" : "名称"}</th>
                   <th>规格</th>
                   <th>{isFinished ? "姓名" : "关联原材料"}</th>
-                  <th>数量({unit})</th>
-                  <th>单价(元/{unit})</th>
+                  <th>包数</th>
+                  <th>公斤数</th>
+                  <th>单价</th>
                   <th>金额</th>
                   <th>备注</th>
                   <th>操作</th>
@@ -296,6 +318,8 @@ export function WarehousePage() {
                   const isOut = item.type === "out";
                   const color = getColor(activeTab, item.linkedId);
                   const spec = getSpec(activeTab, item.linkedId);
+                  const pkgs = getItemPackages(activeTab, item);
+                  const kg = getItemWeightKg(activeTab, item);
                   const linked = activeTab === "finished"
                     ? (dingxingList.find((x) => x.id === item.linkedId)?.name || "-")
                     : getLinkedLabel(activeTab, item.linkedId);
@@ -311,7 +335,10 @@ export function WarehousePage() {
                       <td>{spec}</td>
                       <td>{linked}</td>
                       <td style={{ color: isOut ? "#e74c3c" : "#27ae60" }}>
-                        {isOut ? "-" : "+"}{item.quantity} {unit}
+                        {isOut ? "-" : "+"}{pkgs} 包
+                      </td>
+                      <td style={{ color: isOut ? "#e74c3c" : "#27ae60" }}>
+                        {isOut ? "-" : "+"}{kg} 公斤
                       </td>
                       <td>¥{price.toFixed(2)}</td>
                       <td>¥{amount.toFixed(2)}</td>
@@ -335,7 +362,7 @@ export function WarehousePage() {
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditing(null); }}
         title={editing ? `编辑${isFinished ? "成品" : "原材料"}${txnType === "out" ? "出库" : "入库"}` : `${txnType === "out" ? "出库" : "入库"}${isFinished ? "成品" : "原材料"}`}
-        description={isFinished ? "选择关联的定型记录，填写数量(包)。" : "选择关联的原材料记录，填写重量(公斤)。"}
+        description={isFinished ? "选择关联的定型记录，填写包数和公斤数。" : "选择关联的原材料记录，填写包数和公斤数。"}
       >
         <form className="entity-form" onSubmit={handleSubmit}>
           <div className="form-grid">
@@ -358,8 +385,12 @@ export function WarehousePage() {
               </select>
             </label>
             <label className="form-field">
-              <span>数量({unit})<em>必填</em></span>
-              <input type="number" step="0.01" min="0" value={formQuantity} onChange={(e) => setFormQuantity(e.target.value)} placeholder="0" required />
+              <span>包数</span>
+              <input type="number" step="1" min="0" value={isFinished ? formQuantity : formPackages} onChange={(e) => isFinished ? setFormQuantity(e.target.value) : setFormPackages(e.target.value)} placeholder="包" />
+            </label>
+            <label className="form-field">
+              <span>公斤数</span>
+              <input type="number" step="0.01" min="0" value={isFinished ? formWeightKg : formQuantity} onChange={(e) => isFinished ? setFormWeightKg(e.target.value) : setFormQuantity(e.target.value)} placeholder="公斤" />
             </label>
             <label className="form-field">
               <span>备注</span>
