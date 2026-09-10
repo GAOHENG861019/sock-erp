@@ -70,4 +70,20 @@ describe("原材料采购", () => {
     const modal = screen.getByRole("dialog");
     expect(within(modal).getByText("包数")).toBeInTheDocument();
   });
+
+  it("原材料支持编辑修改", () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "1", name: "棉纱", spec: "32支", weight: 10, unitPrice: 30, amount: 300, packages: 5 },
+    ]));
+    render(<FitnessPage />);
+    // 点击编辑按钮
+    fireEvent.click(screen.getByTitle("编辑"));
+    const modal = screen.getByRole("dialog");
+    expect(within(modal).getByText("编辑原材料")).toBeInTheDocument();
+    // 修改名称
+    const nameInput = within(modal).getByDisplayValue("棉纱");
+    fireEvent.change(nameInput, { target: { value: "棉纱2" } });
+    fireEvent.click(within(modal).getByText("保存"));
+    expect(screen.getByText("棉纱2")).toBeInTheDocument();
+  });
 });
