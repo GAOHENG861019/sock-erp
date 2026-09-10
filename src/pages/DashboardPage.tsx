@@ -72,14 +72,17 @@ export function DashboardPage() {
     dingxing.forEach((d) => { m[d.id] = d; });
     return m;
   }, [dingxing]);
-  const warehouseByColor = useMemo(() => {
-    const groups: Record<string, { bao: number; shuang: number }> = {};
+  const warehouseByColorSpec = useMemo(() => {
+    const groups: Record<string, { packages: number; weightKg: number }> = {};
     finishedInventory.forEach((inv) => {
       const dx = dingxingMap[inv.linkedId];
       const color = dx?.color || "未分类";
-      if (!groups[color]) groups[color] = { bao: 0, shuang: 0 };
-      if (dx?.spec === "包") groups[color].bao += Number(inv.quantity || 0);
-      else groups[color].shuang += Number(inv.quantity || 0);
+      const spec = dx?.spec || "未分类";
+      const key = `${color}|${spec}`;
+      if (!groups[key]) groups[key] = { packages: 0, weightKg: 0 };
+      const sign = inv.type === "out" ? -1 : 1;
+      groups[key].packages += sign * Number(inv.quantity || 0);
+      groups[key].weightKg += sign * Number(inv.weightKg || 0);
     });
     return groups;
   }, [finishedInventory, dingxingMap]);
@@ -106,12 +109,6 @@ export function DashboardPage() {
   const fengtouByName = groupByKey(fengtou, "name");
   const dingxingByColor = groupByKey(dingxing, "color");
   const warehouseCount = data.consultingProjects.length + data.consultingInteractions.length;
-  const warehouseColorText = Object.entries(warehouseByColor).map(([color, q]) => {
-    const parts: string[] = [];
-    if (q.bao) parts.push(`${q.bao}包`);
-    if (q.shuang) parts.push(`${q.shuang}双`);
-    return `${color}:${parts.join("+") || "0"}`;
-  }).join(" ") || "暂无库存";
 
   return (
     <div className="dashboard-page">
@@ -121,7 +118,15 @@ export function DashboardPage() {
           <div className="prod-overview-card" onClick={() => navigate("/fanwa")}><div className="pov-icon"><Factory size={22} /></div><span>翻袜</span><strong>{baoOnly(fanwa)}包</strong><small>¥{sumAmt(fanwa).toFixed(0)}</small><small className="pov-breakdown">{breakdownText(fanwaByName)}</small></div>
           <div className="prod-overview-card" onClick={() => navigate("/fengtou")}><div className="pov-icon"><Factory size={22} /></div><span>缝头</span><strong>{baoOnly(fengtou)}包</strong><small>¥{sumAmt(fengtou).toFixed(0)}</small><small className="pov-breakdown">{breakdownText(fengtouByName)}</small></div>
           <div className="prod-overview-card" onClick={() => navigate("/dingxing")}><div className="pov-icon"><Factory size={22} /></div><span>定型</span><strong>{baoOnly(dingxing)}包</strong><small>¥{sumAmt(dingxing).toFixed(0)}</small><small className="pov-breakdown">{breakdownText(dingxingByColor)}</small></div>
-          <div className="prod-overview-card" onClick={() => navigate("/warehouse")}><div className="pov-icon"><Package size={22} /></div><span>仓库余量</span><strong>{finishedInventory.length}项</strong><small>{warehouseColorText}</small></div>
+          {Object.entries(warehouseByColorSpec).map(([key, val]) => {
+            const [color, spec] = key.split("|");
+            return (
+              <div key={key} className="prod-overview-card" onClick={() => navigate("/warehouse")}><div className="pov-icon"><Package size={22} /></div><span>{color}</span><strong>{val.packages}包</strong><small>{val.weightKg}公斤</small><small className="pov-breakdown">规格：{spec}</small></div>
+            );
+          })}
+          {Object.keys(warehouseByColorSpec).length === 0 && (
+            <div className="prod-overview-card" onClick={() => navigate("/warehouse")}><div className="pov-icon"><Package size={22} /></div><span>仓库余量</span><strong>0包</strong><small>0公斤</small><small className="pov-breakdown">暂无库存</small></div>
+          )}
         </div>
       </Section>
       <nav className="dashboard-command-strip glass-clear" aria-label="快速操作">

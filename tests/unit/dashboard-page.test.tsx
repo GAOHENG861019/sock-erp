@@ -111,16 +111,22 @@ describe("首页总览", () => {
     expect(screen.queryByText("产品中心")).not.toBeInTheDocument();
   });
 
-  it("仓库余量按颜色显示", () => {
+  it("仓库余量按颜色和规格显示包数和公斤数", () => {
     window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
       { id: "dx1", name: "张三", color: "白色", spec: "包", quantity: 100, unitPrice: 5 },
+      { id: "dx2", name: "李四", color: "黑色", spec: "双", quantity: 50, unitPrice: 3 },
     ]));
     window.localStorage.setItem("sock-erp-finished-inventory", JSON.stringify([
-      { id: "fi1", linkedId: "dx1", quantity: 50, note: "" },
+      { id: "fi1", linkedId: "dx1", quantity: 50, weightKg: 100, note: "", type: "in", date: "2024-01-01" },
+      { id: "fi2", linkedId: "dx2", quantity: 20, weightKg: 40, note: "", type: "in", date: "2024-01-02" },
     ]));
     renderDashboard();
     const text = document.body.textContent || "";
     expect(text).toContain("白色");
     expect(text).toContain("50包");
+    expect(text).toContain("100公斤");
+    expect(text).toContain("黑色");
+    expect(text).toContain("20包");
+    expect(text).toContain("40公斤");
   });
 });
