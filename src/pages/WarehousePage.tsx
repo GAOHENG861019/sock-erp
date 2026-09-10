@@ -118,11 +118,22 @@ export function WarehousePage() {
     return r?.name || "未分类";
   }
 
-  // 按颜色/名称计算当前库存余量
-  const balanceByColor = useMemo(() => {
+  function getSpec(tab: TabKey, linkedId: string): string {
+    if (tab === "finished") {
+      const d = dingxingList.find((x) => x.id === linkedId);
+      return d?.spec || "未分类";
+    }
+    const r = rawMaterialList.find((x) => x.id === linkedId);
+    return r?.spec || "未分类";
+  }
+
+  // 按颜色+规格计算当前库存余量
+  const balanceByColorSpec = useMemo(() => {
     const groups: Record<string, number> = {};
     currentList.forEach((item) => {
-      const key = getColor(activeTab, item.linkedId);
+      const color = getColor(activeTab, item.linkedId);
+      const spec = getSpec(activeTab, item.linkedId);
+      const key = `${color}|${spec}`;
       const qty = Number(item.quantity || 0);
       if (item.type === "out") {
         groups[key] = (groups[key] || 0) - qty;
@@ -133,7 +144,7 @@ export function WarehousePage() {
     return groups;
   }, [currentList, activeTab, dingxingList, rawMaterialList]);
 
-  const totalBalance = Object.values(balanceByColor).reduce((s, v) => s + v, 0);
+  const totalBalance = Object.values(balanceByColorSpec).reduce((s, v) => s + v, 0);
 
   function updateList(tab: TabKey, list: InventoryItem[]) {
     if (tab === "finished") setFinishedList(list);
@@ -227,20 +238,23 @@ export function WarehousePage() {
         </button>
       </div>
 
-      {/* 库存余量按颜色/名称汇总 */}
-      <Section title={isFinished ? "成品库存余量（按颜色）" : "原材料库存余量（按名称）"} description="入库减出库后的当前余量">
-        {Object.keys(balanceByColor).length ? (
+      {/* 库存余量按颜色+规格汇总 */}
+      <Section title={isFinished ? "成品库存余量（按颜色和规格）" : "原材料库存余量（按名称和规格）"} description="入库减出库后的当前余量">
+        {Object.keys(balanceByColorSpec).length ? (
           <div className="prod-overview-grid">
-            {Object.entries(balanceByColor).map(([color, qty]) => (
-              <div key={color} className="prod-overview-card">
-                <div className="pov-icon" style={{ background: isFinished ? "#3498db20" : "#f39c1220", color: isFinished ? "#3498db" : "#f39c12" }}>
-                  {isFinished ? <Package size={22} /> : <Cube size={22} />}
+            {Object.entries(balanceByColorSpec).map(([key, qty]) => {
+              const [color, spec] = key.split("|");
+              return (
+                <div key={key} className="prod-overview-card">
+                  <div className="pov-icon" style={{ background: isFinished ? "#3498db20" : "#f39c1220", color: isFinished ? "#3498db" : "#f39c12" }}>
+                    {isFinished ? <Package size={22} /> : <Cube size={22} />}
+                  </div>
+                  <span>{color}</span>
+                  <strong>{qty}公斤</strong>
+                  <small>规格：{spec}</small>
                 </div>
-                <span>{color}</span>
-                <strong>{qty}公斤</strong>
-                <small>{isFinished ? "成品" : "原材料"}</small>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : <p className="quiet-line">暂无库存记录</p>}
         <div className="prod-summary prod-grand">
@@ -264,7 +278,9 @@ export function WarehousePage() {
                 <tr>
                   <th>日期</th>
                   <th>类型</th>
-                  <th>{isFinished ? "关联成品" : "关联原材料"}</th>
+                  <th>{isFinished ? "颜色" : "名称"}</th>
+                  <th>规格</th>
+                  <th>{isFinished ? "姓名" : "关联原材料"}</th>
                   <th>数量(公斤)</th>
                   <th>单价(元/公斤)</th>
                   <th>金额</th>
@@ -277,6 +293,11 @@ export function WarehousePage() {
                   const price = getUnitPrice(activeTab, item.linkedId);
                   const amount = (item.quantity || 0) * price;
                   const isOut = item.type === "out";
+                  const color = getColor(activeTab, item.linkedId);
+                  const spec = getSpec(activeTab, item.linkedId);
+                  const linked = activeTab === "finished"
+                    ? (dingxingList.find((x) => x.id === item.linkedId)?.name || "-")
+                    : getLinkedLabel(activeTab, item.linkedId);
                   return (
                     <tr key={item.id}>
                       <td>{item.date || "-"}</td>
@@ -285,7 +306,9 @@ export function WarehousePage() {
                           {isOut ? "出库" : "入库"}
                         </Badge>
                       </td>
-                      <td><strong>{getLinkedLabel(activeTab, item.linkedId)}</strong></td>
+                      <td><strong>{color}</strong></td>
+                      <td>{spec}</td>
+                      <td>{linked}</td>
                       <td style={{ color: isOut ? "#e74c3c" : "#27ae60" }}>
                         {isOut ? "-" : "+"}{item.quantity} 公斤
                       </td>

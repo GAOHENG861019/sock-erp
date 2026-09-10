@@ -150,4 +150,29 @@ describe("仓库管理页面", () => {
     // 10 + 5 - 3 = 12 公斤
     expect(document.body.textContent).toContain("12 公斤");
   });
+
+  it("库存余量按颜色和规格分别显示", () => {
+    seedDingxing();
+    seedFinishedInventory();
+    render(<WarehousePage />);
+    const text = document.body.textContent || "";
+    expect(text).toContain("按颜色和规格");
+    // dx1: 白色-双, 入库10出库3 = 7公斤
+    expect(text).toContain("白色");
+    expect(text).toContain("7公斤");
+    // dx2: 黑色-包, 入库5 = 5公斤
+    expect(text).toContain("黑色");
+    expect(text).toContain("5公斤");
+  });
+
+  it("出入库记录显示颜色和规格列", () => {
+    seedDingxing();
+    seedFinishedInventory();
+    render(<WarehousePage />);
+    const text = document.body.textContent || "";
+    expect(text).toContain("颜色");
+    expect(text).toContain("规格");
+    expect(text).toContain("双");
+    expect(text).toContain("包");
+  });
 });
