@@ -45,20 +45,20 @@ describe("本月总览数据卡片", () => {
   it("显示5个数据卡片标题", () => {
     renderToday();
     expect(screen.getByText("成品数量")).toBeInTheDocument();
-    expect(screen.getByText("仓库总量")).toBeInTheDocument();
-    expect(screen.getByText("库存余量")).toBeInTheDocument();
+    expect(screen.getByText("仓库余量")).toBeInTheDocument();
+    expect(screen.getByText("仓库重量")).toBeInTheDocument();
     expect(screen.getByText("本月支出")).toBeInTheDocument();
     expect(screen.getByText("本月收入")).toBeInTheDocument();
   });
 
-  it("成品数量从定型数据读取", () => {
+  it("成品数量从定型数据读取按包统计", () => {
     window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
-      { id: "1", name: "A", color: "白色", spec: "双", quantity: 100, unitPrice: 5 },
-      { id: "2", name: "B", color: "黑色", spec: "双", quantity: 50, unitPrice: 4 },
+      { id: "1", name: "A", color: "白色", spec: "包", quantity: 100, unitPrice: 5 },
+      { id: "2", name: "B", color: "黑色", spec: "包", quantity: 50, unitPrice: 4 },
     ]));
     renderToday();
     const text = document.body.textContent || "";
-    expect(text).toContain("150双");
+    expect(text).toContain("150包");
   });
 
   it("定型按颜色分别显示", () => {
@@ -116,7 +116,23 @@ describe("本月总览数据卡片", () => {
     ]));
     renderToday();
     const text = document.body.textContent || "";
-    expect(text).toContain("白色:30公斤");
-    expect(text).toContain("黑色:20公斤");
+    expect(text).toContain("白色");
+    expect(text).toContain("30公斤");
+    expect(text).toContain("黑色");
+    expect(text).toContain("20公斤");
+    expect(text).toContain("50公斤");
+  });
+
+  it("仓库重量关联原材料按名称显示", () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "1", name: "棉纱", spec: "", weight: 50, unitPrice: 40, amount: 2000 },
+      { id: "2", name: "涤纶", spec: "", weight: 30, unitPrice: 30, amount: 900 },
+    ]));
+    renderToday();
+    const text = document.body.textContent || "";
+    expect(text).toContain("仓库重量");
+    expect(text).toContain("80公斤");
+    expect(text).toContain("棉纱");
+    expect(text).toContain("涤纶");
   });
 });

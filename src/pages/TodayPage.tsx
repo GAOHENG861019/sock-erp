@@ -62,25 +62,20 @@ export function TodayPage() {
     try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }
   };
   const dingxing = readLS<any[]>("sock-erp-dingxing", []);
+  // 成品数量：关联定型，按包统计
   const finishedBao = dingxing.filter((i) => i.spec === "包").reduce((s, i) => s + Number(i.quantity || 0), 0);
-  const finishedShuang = dingxing.filter((i) => i.spec === "双").reduce((s, i) => s + Number(i.quantity || 0), 0);
-  const finishedQty = finishedBao ? `${finishedBao}包` : finishedShuang ? `${finishedShuang}双` : "0";
   // 定型按颜色分组
   const dingxingByColor = useMemo(() => {
-    const groups: Record<string, { bao: number; shuang: number; amount: number }> = {};
+    const groups: Record<string, { bao: number; amount: number }> = {};
     dingxing.forEach((d) => {
       const color = d.color || "未分类";
-      if (!groups[color]) groups[color] = { bao: 0, shuang: 0, amount: 0 };
+      if (!groups[color]) groups[color] = { bao: 0, amount: 0 };
       if (d.spec === "包") groups[color].bao += Number(d.quantity || 0);
-      else groups[color].shuang += Number(d.quantity || 0);
       groups[color].amount += Number(d.quantity || 0) * Number(d.unitPrice || 0);
     });
     return groups;
   }, [dingxing]);
-  const warehouseTotal = data.consultingProjects.length + data.consultingInteractions.length;
-  const inventory = readLS<any[]>("sock-erp-inventory", []);
-  const inventoryQty = inventory.reduce((s, i) => s + Number(i.quantity || 0), 0);
-  // 仓库余量按颜色统计（关联成品库存→定型颜色）
+  // 仓库余量：关联仓库管理（成品库存），按颜色统计公斤
   const finishedInv = readLS<any[]>("sock-erp-finished-inventory", []);
   const dxMap: Record<string, any> = {};
   dingxing.forEach((d) => { dxMap[d.id] = d; });
@@ -90,19 +85,29 @@ export function TodayPage() {
     const color = dx?.color || "未分类";
     warehouseByColor[color] = (warehouseByColor[color] || 0) + Number(inv.quantity || 0);
   });
+  const warehouseTotalKg = Object.values(warehouseByColor).reduce((s, v) => s + v, 0);
   const warehouseColorText = Object.entries(warehouseByColor).map(([c, q]) => `${c}:${q}公斤`).join(" ") || "暂无库存";
+  // 仓库重量：关联库存盘点（原材料），按名称统计公斤
+  const rawMaterials = readLS<any[]>("sock-erp-raw-materials", []);
+  const materialByName: Record<string, number> = {};
+  rawMaterials.forEach((m) => {
+    const name = m.name || "未分类";
+    materialByName[name] = (materialByName[name] || 0) + Number(m.weight || 0);
+  });
+  const materialTotalKg = Object.values(materialByName).reduce((s, v) => s + v, 0);
+  const materialText = Object.entries(materialByName).map(([n, w]) => `${n}:${w}公斤`).join(" ") || "暂无原材料";
+  // 支出收入
   const machineLoss = readLS<any[]>("sock-erp-machine-loss", []);
   const freight = readLS<any[]>("sock-erp-freight", []);
   const salary = readLS<any[]>("sock-erp-salary", []);
-  const rawMaterials = readLS<any[]>("sock-erp-raw-materials", []);
   const monthExpense = [...machineLoss, ...freight, ...salary, ...rawMaterials].reduce((s, i) => s + Number(i.amount || 0), 0);
   const income = readLS<any[]>("sock-erp-income", []);
   const monthIncome = income.reduce((s, i) => s + Number(i.amount || 0), 0);
 
   const overviewCards = [
-    { label: "成品数量", value: finishedQty, color: "#3498db", icon: "📦" },
-    { label: "仓库总量", value: `${warehouseTotal} 项`, color: "#2ecc71", icon: "🏭" },
-    { label: "库存余量", value: warehouseColorText, color: "#9b59b6", icon: "📊" },
+    { label: "成品数量", value: `${finishedBao}包`, color: "#3498db", icon: "📦" },
+    { label: "仓库余量", value: `${warehouseTotalKg}公斤`, color: "#2ecc71", icon: "🏭" },
+    { label: "仓库重量", value: `${materialTotalKg}公斤`, color: "#9b59b6", icon: "📊" },
     { label: "本月支出", value: `¥${monthExpense.toFixed(0)}`, color: "#e74c3c", icon: "💸" },
     { label: "本月收入", value: `¥${monthIncome.toFixed(0)}`, color: "#f39c12", icon: "💰" },
   ];
@@ -124,21 +129,44 @@ export function TodayPage() {
       <Section title="定型按颜色统计" description="成品定型按颜色分别统计数量和金额">
         {Object.keys(dingxingByColor).length ? (
           <div className="prod-overview-grid">
-            {Object.entries(dingxingByColor).map(([color, stats]) => {
-              const parts: string[] = [];
-              if (stats.bao) parts.push(`${stats.bao}包`);
-              if (stats.shuang) parts.push(`${stats.shuang}双`);
-              return (
-                <div key={color} className="prod-overview-card">
-                  <div className="pov-icon" style={{ background: "#9b59b620", color: "#9b59b6" }}>🎨</div>
-                  <span>{color}</span>
-                  <strong>{parts.join("+") || "0"}</strong>
-                  <small>¥{stats.amount.toFixed(0)}</small>
-                </div>
-              );
-            })}
+            {Object.entries(dingxingByColor).map(([color, stats]) => (
+              <div key={color} className="prod-overview-card">
+                <div className="pov-icon" style={{ background: "#9b59b620", color: "#9b59b6" }}>🎨</div>
+                <span>{color}</span>
+                <strong>{stats.bao}包</strong>
+                <small>¥{stats.amount.toFixed(0)}</small>
+              </div>
+            ))}
           </div>
         ) : <p className="quiet-line">暂无定型记录</p>}
+      </Section>
+      <Section title="仓库余量按颜色" description="关联仓库管理成品库存，按颜色分别显示">
+        {Object.keys(warehouseByColor).length ? (
+          <div className="prod-overview-grid">
+            {Object.entries(warehouseByColor).map(([color, kg]) => (
+              <div key={color} className="prod-overview-card">
+                <div className="pov-icon" style={{ background: "#2ecc7120", color: "#2ecc71" }}>🏭</div>
+                <span>{color}</span>
+                <strong>{kg}公斤</strong>
+                <small>成品库存</small>
+              </div>
+            ))}
+          </div>
+        ) : <p className="quiet-line">暂无仓库库存</p>}
+      </Section>
+      <Section title="仓库重量按原材料" description="关联库存盘点，按原材料名称分别显示">
+        {Object.keys(materialByName).length ? (
+          <div className="prod-overview-grid">
+            {Object.entries(materialByName).map(([name, kg]) => (
+              <div key={name} className="prod-overview-card">
+                <div className="pov-icon" style={{ background: "#f39c1220", color: "#f39c12" }}>📊</div>
+                <span>{name}</span>
+                <strong>{kg}公斤</strong>
+                <small>原材料</small>
+              </div>
+            ))}
+          </div>
+        ) : <p className="quiet-line">暂无原材料</p>}
       </Section>
       <div className="plan-toolbar">
         <div className="segmented" role="tablist">{(["today", "week", "history"] as const).map((key) => <button key={key} className={view === key ? "active" : ""} onClick={() => setView(key)}>{key === "today" ? "今日" : key === "week" ? "本周" : "历史"}</button>)}</div>
