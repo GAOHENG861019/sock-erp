@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash, Package, Cube, Calculator } from "@phosphor-icons/react";
+import { Plus, Pencil, Trash, Package, Cube, Calculator, ArrowDown, ArrowUp } from "@phosphor-icons/react";
 import { PageHeader, Section, Button, Modal, ConfirmDialog, EmptyState, Badge } from "../components/ui";
 import { ModuleArtwork } from "../components/ModuleArtwork";
 
 type TabKey = "finished" | "material";
+type TxnType = "in" | "out";
 
 type DingxingRecord = {
   id: string;
@@ -28,6 +29,8 @@ type InventoryItem = {
   linkedId: string;
   quantity: number;
   note: string;
+  type: TxnType;
+  date: string;
 };
 
 const FINISHED_KEY = "sock-erp-finished-inventory";
@@ -76,11 +79,12 @@ export function WarehousePage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
+  const [txnType, setTxnType] = useState<TxnType>("in");
 
-  // 表单状态
   const [formLinkedId, setFormLinkedId] = useState("");
   const [formQuantity, setFormQuantity] = useState("");
   const [formNote, setFormNote] = useState("");
+  const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10));
 
   const dingxingList = useMemo(() => readJsonArray<DingxingRecord>(DINGXING_KEY), []);
   const rawMaterialList = useMemo(() => readJsonArray<RawMaterialRecord>(RAW_MATERIAL_KEY), []);
@@ -105,33 +109,54 @@ export function WarehousePage() {
     return r ? `${r.name ?? ""} - ${r.spec ?? ""}` : "关联已删除";
   }
 
-  const totals = useMemo(() => {
-    const totalQty = currentList.reduce((s, i) => s + (i.quantity || 0), 0);
-    const totalAmount = currentList.reduce((s, i) => {
-      const price = getUnitPrice(activeTab, i.linkedId);
-      return s + (i.quantity || 0) * price;
-    }, 0);
-    return { totalQty, totalAmount };
+  function getColor(tab: TabKey, linkedId: string): string {
+    if (tab === "finished") {
+      const d = dingxingList.find((x) => x.id === linkedId);
+      return d?.color || "未分类";
+    }
+    const r = rawMaterialList.find((x) => x.id === linkedId);
+    return r?.name || "未分类";
+  }
+
+  // 按颜色/名称计算当前库存余量
+  const balanceByColor = useMemo(() => {
+    const groups: Record<string, number> = {};
+    currentList.forEach((item) => {
+      const key = getColor(activeTab, item.linkedId);
+      const qty = Number(item.quantity || 0);
+      if (item.type === "out") {
+        groups[key] = (groups[key] || 0) - qty;
+      } else {
+        groups[key] = (groups[key] || 0) + qty;
+      }
+    });
+    return groups;
   }, [currentList, activeTab, dingxingList, rawMaterialList]);
+
+  const totalBalance = Object.values(balanceByColor).reduce((s, v) => s + v, 0);
 
   function updateList(tab: TabKey, list: InventoryItem[]) {
     if (tab === "finished") setFinishedList(list);
     else setMaterialList(list);
   }
 
-  function openAdd() {
+  function openAdd(type: TxnType = "in") {
     setEditing(null);
+    setTxnType(type);
     setFormLinkedId("");
     setFormQuantity("");
     setFormNote("");
+    setFormDate(new Date().toISOString().slice(0, 10));
     setModalOpen(true);
   }
 
   function openEdit(item: InventoryItem) {
     setEditing(item);
+    setTxnType(item.type || "in");
     setFormLinkedId(item.linkedId);
     setFormQuantity(String(item.quantity));
     setFormNote(item.note);
+    setFormDate(item.date || new Date().toISOString().slice(0, 10));
     setModalOpen(true);
   }
 
@@ -143,9 +168,9 @@ export function WarehousePage() {
     const note = formNote.trim();
     if (editing) {
       const idx = list.findIndex((i) => i.id === editing.id);
-      if (idx >= 0) list[idx] = { ...list[idx], linkedId: formLinkedId, quantity, note };
+      if (idx >= 0) list[idx] = { ...list[idx], linkedId: formLinkedId, quantity, note, type: txnType, date: formDate };
     } else {
-      list.push({ id: genId(), linkedId: formLinkedId, quantity, note });
+      list.push({ id: genId(), linkedId: formLinkedId, quantity, note, type: txnType, date: formDate });
     }
     updateList(activeTab, list);
     setModalOpen(false);
@@ -170,9 +195,12 @@ export function WarehousePage() {
         icon={<ModuleArtwork module="consulting" />}
         eyebrow="仓库与商品"
         title="仓库管理"
-        description="管理成品库存和原材料库存(公斤)，支持关联定型和原材料采购数据。"
+        description="管理成品库存和原材料库存(公斤)，支持入库出库，关联定型和原材料采购数据。"
         actions={
-          <Button onClick={openAdd}><Plus size={17} />{isFinished ? "添加成品库存" : "添加原材料库存"}</Button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button onClick={() => openAdd("in")}><ArrowDown size={17} />入库</Button>
+            <Button variant="secondary" onClick={() => openAdd("out")}><ArrowUp size={17} />出库</Button>
+          </div>
         }
       />
 
@@ -199,36 +227,68 @@ export function WarehousePage() {
         </button>
       </div>
 
+      {/* 库存余量按颜色/名称汇总 */}
+      <Section title={isFinished ? "成品库存余量（按颜色）" : "原材料库存余量（按名称）"} description="入库减出库后的当前余量">
+        {Object.keys(balanceByColor).length ? (
+          <div className="prod-overview-grid">
+            {Object.entries(balanceByColor).map(([color, qty]) => (
+              <div key={color} className="prod-overview-card">
+                <div className="pov-icon" style={{ background: isFinished ? "#3498db20" : "#f39c1220", color: isFinished ? "#3498db" : "#f39c12" }}>
+                  {isFinished ? <Package size={22} /> : <Cube size={22} />}
+                </div>
+                <span>{color}</span>
+                <strong>{qty}公斤</strong>
+                <small>{isFinished ? "成品" : "原材料"}</small>
+              </div>
+            ))}
+          </div>
+        ) : <p className="quiet-line">暂无库存记录</p>}
+        <div className="prod-summary prod-grand">
+          <span><Calculator size={18} />当前总余量：<strong>{totalBalance} 公斤</strong></span>
+        </div>
+      </Section>
+
       <Section
-        title={isFinished ? "成品库存" : "原材料库存"}
+        title={isFinished ? "出入库记录" : "出入库记录"}
         description={`共 ${currentList.length} 条记录，单价从${isFinished ? "定型" : "原材料采购"}记录自动读取`}
       >
         {currentList.length === 0 ? (
           <EmptyState
-            title={isFinished ? "暂无成品库存" : "暂无原材料库存"}
-            description={isFinished ? "点击添加成品库存" : "点击添加原材料库存"}
+            title={isFinished ? "暂无成品库存记录" : "暂无原材料库存记录"}
+            description={isFinished ? "点击入库或出库添加记录" : "点击入库或出库添加记录"}
           />
         ) : (
           <>
             <table className="prod-table">
               <thead>
                 <tr>
+                  <th>日期</th>
+                  <th>类型</th>
                   <th>{isFinished ? "关联成品" : "关联原材料"}</th>
-                  <th>库存数量(公斤)</th>
+                  <th>数量(公斤)</th>
                   <th>单价(元/公斤)</th>
-                  <th>库存金额</th>
+                  <th>金额</th>
                   <th>备注</th>
                   <th>操作</th>
                 </tr>
               </thead>
               <tbody>
-                {currentList.map((item) => {
+                {[...currentList].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map((item) => {
                   const price = getUnitPrice(activeTab, item.linkedId);
                   const amount = (item.quantity || 0) * price;
+                  const isOut = item.type === "out";
                   return (
                     <tr key={item.id}>
+                      <td>{item.date || "-"}</td>
+                      <td>
+                        <Badge tone={isOut ? "danger" : "success"}>
+                          {isOut ? "出库" : "入库"}
+                        </Badge>
+                      </td>
                       <td><strong>{getLinkedLabel(activeTab, item.linkedId)}</strong></td>
-                      <td>{item.quantity} 公斤</td>
+                      <td style={{ color: isOut ? "#e74c3c" : "#27ae60" }}>
+                        {isOut ? "-" : "+"}{item.quantity} 公斤
+                      </td>
                       <td>¥{price.toFixed(2)}</td>
                       <td>¥{amount.toFixed(2)}</td>
                       <td>{item.note || "-"}</td>
@@ -243,10 +303,6 @@ export function WarehousePage() {
                 })}
               </tbody>
             </table>
-            <div className="prod-summary prod-grand">
-              <span><Calculator size={18} />{isFinished ? "成品总数量" : "原材料总重量"}：<strong>{totals.totalQty} 公斤</strong></span>
-              <span>{isFinished ? "成品总金额" : "原材料总金额"}：<strong>¥{totals.totalAmount.toFixed(2)}</strong></span>
-            </div>
           </>
         )}
       </Section>
@@ -254,11 +310,22 @@ export function WarehousePage() {
       <Modal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditing(null); }}
-        title={editing ? `编辑${isFinished ? "成品" : "原材料"}库存` : `添加${isFinished ? "成品" : "原材料"}库存`}
-        description={isFinished ? "选择关联的定型记录，填写库存数量(公斤)。" : "选择关联的原材料记录，填写库存重量(公斤)。"}
+        title={editing ? `编辑${isFinished ? "成品" : "原材料"}${txnType === "out" ? "出库" : "入库"}` : `${txnType === "out" ? "出库" : "入库"}${isFinished ? "成品" : "原材料"}`}
+        description={isFinished ? "选择关联的定型记录，填写数量(公斤)。" : "选择关联的原材料记录，填写重量(公斤)。"}
       >
         <form className="entity-form" onSubmit={handleSubmit}>
           <div className="form-grid">
+            <label className="form-field">
+              <span>类型<em>必填</em></span>
+              <select value={txnType} onChange={(e) => setTxnType(e.target.value as TxnType)}>
+                <option value="in">入库</option>
+                <option value="out">出库</option>
+              </select>
+            </label>
+            <label className="form-field">
+              <span>日期</span>
+              <input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+            </label>
             <label className="form-field">
               <span>{isFinished ? "关联定型" : "关联原材料"}<em>必填</em></span>
               <select value={formLinkedId} onChange={(e) => setFormLinkedId(e.target.value)} required>
@@ -267,8 +334,8 @@ export function WarehousePage() {
               </select>
             </label>
             <label className="form-field">
-              <span>库存数量(公斤)<em>必填</em></span>
-              <input type="number" step="0.01" value={formQuantity} onChange={(e) => setFormQuantity(e.target.value)} placeholder="0" required />
+              <span>数量(公斤)<em>必填</em></span>
+              <input type="number" step="0.01" min="0" value={formQuantity} onChange={(e) => setFormQuantity(e.target.value)} placeholder="0" required />
             </label>
             <label className="form-field">
               <span>备注</span>
@@ -277,7 +344,7 @@ export function WarehousePage() {
           </div>
           <footer className="modal-actions">
             <Button type="button" variant="ghost" onClick={() => { setModalOpen(false); setEditing(null); }}>取消</Button>
-            <Button type="submit">{editing ? "保存修改" : isFinished ? "添加成品库存" : "添加原材料库存"}</Button>
+            <Button type="submit">{editing ? "保存修改" : txnType === "out" ? "确认出库" : "确认入库"}</Button>
           </footer>
         </form>
       </Modal>
@@ -285,7 +352,7 @@ export function WarehousePage() {
       <ConfirmDialog
         open={deleteTarget !== null}
         title="删除库存记录"
-        description={`确定要删除这条${isFinished ? "成品" : "原材料"}库存记录吗？此操作不可撤销。`}
+        description={`确定要删除这条${isFinished ? "成品" : "原材料"}${deleteTarget?.type === "out" ? "出库" : "入库"}记录吗？此操作不可撤销。`}
         confirmLabel="删除"
         danger
         onConfirm={confirmDelete}
