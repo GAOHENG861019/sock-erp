@@ -62,27 +62,10 @@ export function DashboardPage() {
 
   useEffect(() => registerSaveHandler(persistMemo), [persistMemo, registerSaveHandler]);
 
-  if (dashboard.isLoading) return <><PageHeader icon={<ModuleArtwork module="dashboard" />} eyebrow="今天" title="正在整理你的系统" description="读取本月计划和各模块状态" /><Skeleton lines={8} /></>;
-  if (dashboard.error || !dashboard.data) return <ErrorState message={(dashboard.error as Error)?.message ?? "首页数据不可用"} onRetry={() => dashboard.refetch()} />;
-  const value = dashboard.data;
-
   // 生产数据统计（从 localStorage 读取）
   const fanwa = readLS<any[]>("sock-erp-fanwa", []);
   const fengtou = readLS<any[]>("sock-erp-fengtou", []);
   const dingxing = readLS<any[]>("sock-erp-dingxing", []);
-  const sumQty = (arr: any[]) => arr.reduce((s, i) => s + Number(i.quantity || 0), 0);
-  const sumAmt = (arr: any[]) => arr.reduce((s, i) => s + Number(i.quantity || 0) * Number(i.unitPrice || 0), 0);
-  const fmtQty = (arr: any[]) => {
-    const shuang = arr.filter((i) => i.spec === "双").reduce((s, i) => s + Number(i.quantity || 0), 0);
-    const bao = arr.filter((i) => i.spec === "包").reduce((s, i) => s + Number(i.quantity || 0), 0);
-    const parts: string[] = [];
-    if (shuang) parts.push(`${shuang}双`);
-    if (bao) parts.push(`${bao}包`);
-    return parts.length ? parts.join("+") : "0";
-  };
-  const warehouseCount = data.consultingProjects.length + data.consultingInteractions.length;
-
-  // 仓库余量：按颜色统计成品库存（关联定型数据）
   const finishedInventory = readLS<any[]>("sock-erp-finished-inventory", []);
   const dingxingMap = useMemo(() => {
     const m: Record<string, any> = {};
@@ -100,6 +83,22 @@ export function DashboardPage() {
     });
     return groups;
   }, [finishedInventory, dingxingMap]);
+
+  if (dashboard.isLoading) return <><PageHeader icon={<ModuleArtwork module="dashboard" />} eyebrow="今天" title="正在整理你的系统" description="读取本月计划和各模块状态" /><Skeleton lines={8} /></>;
+  if (dashboard.error || !dashboard.data) return <ErrorState message={(dashboard.error as Error)?.message ?? "首页数据不可用"} onRetry={() => dashboard.refetch()} />;
+  const value = dashboard.data;
+
+  const sumQty = (arr: any[]) => arr.reduce((s, i) => s + Number(i.quantity || 0), 0);
+  const sumAmt = (arr: any[]) => arr.reduce((s, i) => s + Number(i.quantity || 0) * Number(i.unitPrice || 0), 0);
+  const fmtQty = (arr: any[]) => {
+    const shuang = arr.filter((i) => i.spec === "双").reduce((s, i) => s + Number(i.quantity || 0), 0);
+    const bao = arr.filter((i) => i.spec === "包").reduce((s, i) => s + Number(i.quantity || 0), 0);
+    const parts: string[] = [];
+    if (shuang) parts.push(`${shuang}双`);
+    if (bao) parts.push(`${bao}包`);
+    return parts.length ? parts.join("+") : "0";
+  };
+  const warehouseCount = data.consultingProjects.length + data.consultingInteractions.length;
   const warehouseColorText = Object.entries(warehouseByColor).map(([color, q]) => {
     const parts: string[] = [];
     if (q.bao) parts.push(`${q.bao}包`);
