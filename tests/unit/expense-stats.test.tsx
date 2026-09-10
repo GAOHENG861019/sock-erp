@@ -65,4 +65,22 @@ describe("支出统计-包含原材料", () => {
     render(<ExpenseStatsPage />);
     expect(screen.getByText("导出CSV")).toBeInTheDocument();
   });
+
+  it("工资支出关联生产记录（翻袜缝头定型金额计入工资）", () => {
+    window.localStorage.setItem("sock-erp-fanwa", JSON.stringify([
+      { id: "1", name: "张三", spec: "包", quantity: 10, unitPrice: 5, date: "2024-01-15" },
+    ]));
+    window.localStorage.setItem("sock-erp-fengtou", JSON.stringify([
+      { id: "1", name: "李四", spec: "包", quantity: 5, unitPrice: 3, date: "2024-01-15" },
+    ]));
+    window.localStorage.setItem("sock-erp-salary", JSON.stringify([
+      { id: "1", date: "2024-01-17", amount: 100, note: "奖金" },
+    ]));
+    render(<ExpenseStatsPage />);
+    const text = document.body.textContent || "";
+    // 工资 = 翻袜50 + 缝头15 + 额外100 = 165
+    expect(text).toContain("¥165.00");
+    expect(text).toContain("翻袜-张三");
+    expect(text).toContain("缝头-李四");
+  });
 });

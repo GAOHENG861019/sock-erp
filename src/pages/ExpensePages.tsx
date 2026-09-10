@@ -91,8 +91,12 @@ export function ExpenseRecordPage({
 export function ExpenseStatsPage() {
   const [machine] = useLocalStorage<ExpenseItem[]>("sock-erp-machine-loss", []);
   const [freight] = useLocalStorage<ExpenseItem[]>("sock-erp-freight", []);
-  const [salary] = useLocalStorage<ExpenseItem[]>("sock-erp-salary", []);
+  const [salaryExtras] = useLocalStorage<ExpenseItem[]>("sock-erp-salary", []);
   const [rawMaterials] = useLocalStorage<any[]>("sock-erp-raw-materials", []);
+  // 工资支出关联生产记录（翻袜/缝头/定型）+ 额外工资
+  const [fanwa] = useLocalStorage<any[]>("sock-erp-fanwa", []);
+  const [fengtou] = useLocalStorage<any[]>("sock-erp-fengtou", []);
+  const [dingxing] = useLocalStorage<any[]>("sock-erp-dingxing", []);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -104,15 +108,38 @@ export function ExpenseStatsPage() {
     });
   };
 
+  const filterProductionByDate = (items: any[]) => {
+    return items.filter((i) => {
+      if (!i.date) return true; // 无日期的记录全部纳入
+      if (startDate && i.date < startDate) return false;
+      if (endDate && i.date > endDate) return false;
+      return true;
+    });
+  };
+
   const mFiltered = filterByDate(machine);
   const fFiltered = filterByDate(freight);
-  const sFiltered = filterByDate(salary);
+  const sExtraFiltered = filterByDate(salaryExtras);
+  // 生产记录按日期筛选
+  const fanwaFiltered = filterProductionByDate(fanwa);
+  const fengtouFiltered = filterProductionByDate(fengtou);
+  const dingxingFiltered = filterProductionByDate(dingxing);
+  // 工资总额 = 生产金额(翻袜+缝头+定型) + 额外工资
+  const productionSalary = [...fanwaFiltered, ...fengtouFiltered, ...dingxingFiltered].reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
+  const extraSalary = sExtraFiltered.reduce((s, i) => s + Number(i.amount || 0), 0);
+  const sTotal = productionSalary + extraSalary;
+  // 工资明细：生产记录 + 额外工资
+  const salaryDetail = [
+    ...fanwaFiltered.map((i) => ({ id: i.id, date: i.date || "无日期", amount: (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), note: `翻袜-${i.name}`, cat: "工资支出" })),
+    ...fengtouFiltered.map((i) => ({ id: i.id, date: i.date || "无日期", amount: (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), note: `缝头-${i.name}`, cat: "工资支出" })),
+    ...dingxingFiltered.map((i) => ({ id: i.id, date: i.date || "无日期", amount: (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), note: `定型-${i.name}(${i.color || ""})`, cat: "工资支出" })),
+    ...sExtraFiltered.map((i) => ({ ...i, cat: "工资支出" })),
+  ];
   // 原材料无日期字段，全部纳入
   const rFiltered = rawMaterials;
 
   const mTotal = mFiltered.reduce((s, i) => s + Number(i.amount || 0), 0);
   const fTotal = fFiltered.reduce((s, i) => s + Number(i.amount || 0), 0);
-  const sTotal = sFiltered.reduce((s, i) => s + Number(i.amount || 0), 0);
   const rTotal = rFiltered.reduce((s, i) => s + Number(i.amount || 0), 0);
   const grandTotal = mTotal + fTotal + sTotal + rTotal;
 
@@ -123,7 +150,7 @@ export function ExpenseStatsPage() {
       ["类别", "日期", "用途", "金额"],
       ...mFiltered.map((i) => ["机器损耗", i.date, i.note, i.amount]),
       ...fFiltered.map((i) => ["运货运费", i.date, i.note, i.amount]),
-      ...sFiltered.map((i) => ["工资支出", i.date, i.note, i.amount]),
+      ...salaryDetail.map((i) => ["工资支出", i.date, i.note, i.amount]),
       ...rFiltered.map((i) => ["原材料采购", i.date || "无日期", `${i.name} ${i.spec || ""}`.trim(), i.amount]),
       [],
       ["汇总", "", "", ""],
@@ -186,7 +213,7 @@ export function ExpenseStatsPage() {
           <table className="prod-table">
             <thead><tr><th>类别</th><th>日期</th><th>用途</th><th>金额</th></tr></thead>
             <tbody>
-              {[...mFiltered.map((i) => ({ ...i, cat: "机器损耗" })), ...fFiltered.map((i) => ({ ...i, cat: "运货运费" })), ...sFiltered.map((i) => ({ ...i, cat: "工资支出" })), ...rFiltered.map((i) => ({ id: i.id, date: i.date || "无日期", amount: i.amount, note: `${i.name} ${i.spec || ""}`.trim(), cat: "原材料采购" }))].sort((a, b) => String(b.date).localeCompare(String(a.date))).map((item) => (
+              {[...mFiltered.map((i) => ({ ...i, cat: "机器损耗" })), ...fFiltered.map((i) => ({ ...i, cat: "运货运费" })), ...salaryDetail.map((i) => ({ ...i, cat: "工资支出" })), ...rFiltered.map((i) => ({ id: i.id, date: i.date || "无日期", amount: i.amount, note: `${i.name} ${i.spec || ""}`.trim(), cat: "原材料采购" }))].sort((a, b) => String(b.date).localeCompare(String(a.date))).map((item) => (
                 <tr key={item.id}>
                   <td><span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 12, background: item.cat === "机器损耗" ? "#fde8e8" : item.cat === "运货运费" ? "#e8f4fd" : item.cat === "原材料采购" ? "#fef5e7" : "#e8f8ef", color: item.cat === "机器损耗" ? "#e74c3c" : item.cat === "运货运费" ? "#3498db" : item.cat === "原材料采购" ? "#f39c12" : "#2ecc71" }}>{item.cat}</span></td>
                   <td>{item.date}</td>
