@@ -196,6 +196,7 @@ export function WarehousePage() {
   }
 
   const isFinished = activeTab === "finished";
+  const unit = isFinished ? "包" : "公斤";
   const options = isFinished
     ? dingxingList.map((d) => ({ value: d.id, label: `${d.color ?? ""} - ${d.spec ?? ""} - ${d.name ?? ""}` }))
     : rawMaterialList.map((r) => ({ value: r.id, label: `${r.name ?? ""} - ${r.spec ?? ""}` }));
@@ -206,7 +207,7 @@ export function WarehousePage() {
         icon={<ModuleArtwork module="consulting" />}
         eyebrow="仓库与商品"
         title="仓库管理"
-        description="管理成品库存和原材料库存(公斤)，支持入库出库，关联定型和原材料采购数据。"
+        description="管理成品库存(包)和原材料库存(公斤)，支持入库出库，关联定型和原材料采购数据。"
         actions={
           <div style={{ display: "flex", gap: 8 }}>
             <Button onClick={() => openAdd("in")}><ArrowDown size={17} />入库</Button>
@@ -250,7 +251,7 @@ export function WarehousePage() {
                     {isFinished ? <Package size={22} /> : <Cube size={22} />}
                   </div>
                   <span>{color}</span>
-                  <strong>{qty}公斤</strong>
+                  <strong>{qty}{unit}</strong>
                   <small>规格：{spec}</small>
                 </div>
               );
@@ -258,7 +259,7 @@ export function WarehousePage() {
           </div>
         ) : <p className="quiet-line">暂无库存记录</p>}
         <div className="prod-summary prod-grand">
-          <span><Calculator size={18} />当前总余量：<strong>{totalBalance} 公斤</strong></span>
+          <span><Calculator size={18} />当前总余量：<strong>{totalBalance} {unit}</strong></span>
         </div>
       </Section>
 
@@ -281,8 +282,8 @@ export function WarehousePage() {
                   <th>{isFinished ? "颜色" : "名称"}</th>
                   <th>规格</th>
                   <th>{isFinished ? "姓名" : "关联原材料"}</th>
-                  <th>数量(公斤)</th>
-                  <th>单价(元/公斤)</th>
+                  <th>数量({unit})</th>
+                  <th>单价(元/{unit})</th>
                   <th>金额</th>
                   <th>备注</th>
                   <th>操作</th>
@@ -310,7 +311,7 @@ export function WarehousePage() {
                       <td>{spec}</td>
                       <td>{linked}</td>
                       <td style={{ color: isOut ? "#e74c3c" : "#27ae60" }}>
-                        {isOut ? "-" : "+"}{item.quantity} 公斤
+                        {isOut ? "-" : "+"}{item.quantity} {unit}
                       </td>
                       <td>¥{price.toFixed(2)}</td>
                       <td>¥{amount.toFixed(2)}</td>
@@ -334,7 +335,7 @@ export function WarehousePage() {
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditing(null); }}
         title={editing ? `编辑${isFinished ? "成品" : "原材料"}${txnType === "out" ? "出库" : "入库"}` : `${txnType === "out" ? "出库" : "入库"}${isFinished ? "成品" : "原材料"}`}
-        description={isFinished ? "选择关联的定型记录，填写数量(公斤)。" : "选择关联的原材料记录，填写重量(公斤)。"}
+        description={isFinished ? "选择关联的定型记录，填写数量(包)。" : "选择关联的原材料记录，填写重量(公斤)。"}
       >
         <form className="entity-form" onSubmit={handleSubmit}>
           <div className="form-grid">
@@ -357,7 +358,7 @@ export function WarehousePage() {
               </select>
             </label>
             <label className="form-field">
-              <span>数量(公斤)<em>必填</em></span>
+              <span>数量({unit})<em>必填</em></span>
               <input type="number" step="0.01" min="0" value={formQuantity} onChange={(e) => setFormQuantity(e.target.value)} placeholder="0" required />
             </label>
             <label className="form-field">

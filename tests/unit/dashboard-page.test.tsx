@@ -59,7 +59,7 @@ describe("首页总览", () => {
     expect(screen.queryByText("已安排")).not.toBeInTheDocument();
   });
 
-  it("生产卡片显示金额为主，数量按包并按姓名/颜色分组", () => {
+  it("生产卡片显示包数为主，金额为辅并按姓名/颜色分组", () => {
     window.localStorage.setItem("sock-erp-fanwa", JSON.stringify([
       { id: "1", name: "甲", spec: "包", quantity: 10, unitPrice: 5 },
       { id: "2", name: "乙", spec: "包", quantity: 5, unitPrice: 5 },
@@ -106,9 +106,9 @@ describe("首页总览", () => {
     expect(text).not.toContain("本月时间线");
   });
 
-  it("显示产品中心卡片", () => {
+  it("不显示产品中心卡片", () => {
     renderDashboard();
-    expect(screen.getByText("产品中心")).toBeInTheDocument();
+    expect(screen.queryByText("产品中心")).not.toBeInTheDocument();
   });
 
   it("仓库余量按颜色显示", () => {

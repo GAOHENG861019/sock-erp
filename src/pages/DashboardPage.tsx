@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { Check, Clock, ArrowRight, NotePencil, CalendarBlank, Plus, Barbell, ListPlus, Bug, Factory, Package, GridFour } from "@phosphor-icons/react";
+import { Check, Clock, ArrowRight, NotePencil, CalendarBlank, Plus, Barbell, ListPlus, Bug, Factory, Package } from "@phosphor-icons/react";
 import { api } from "../api";
 import { useWorkspace } from "../WorkspaceContext";
 import { localDate, formatDate, classNames } from "../utils";
@@ -118,10 +118,9 @@ export function DashboardPage() {
       <PageHeader icon={<ModuleArtwork module="dashboard" />} eyebrow={new Intl.DateTimeFormat("zh-CN", { weekday: "long" }).format(new Date())} title={`${new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(new Date())}，从重点开始`} description="今天的行动、提醒和业务状态都在这里。" actions={<Button onClick={() => navigate("/today?new=1")}><Plus size={17} />添加当日产量</Button>} />
       <Section title="生产数据总览" description="翻袜、缝头、定型累计金额与仓库余量">
         <div className="prod-overview-grid">
-          <div className="prod-overview-card" onClick={() => navigate("/fanwa")}><div className="pov-icon"><Factory size={22} /></div><span>翻袜</span><strong>¥{sumAmt(fanwa).toFixed(0)}</strong><small>{baoOnly(fanwa)}包</small><small className="pov-breakdown">{breakdownText(fanwaByName)}</small></div>
-          <div className="prod-overview-card" onClick={() => navigate("/fengtou")}><div className="pov-icon"><Factory size={22} /></div><span>缝头</span><strong>¥{sumAmt(fengtou).toFixed(0)}</strong><small>{baoOnly(fengtou)}包</small><small className="pov-breakdown">{breakdownText(fengtouByName)}</small></div>
-          <div className="prod-overview-card" onClick={() => navigate("/dingxing")}><div className="pov-icon"><Factory size={22} /></div><span>定型</span><strong>¥{sumAmt(dingxing).toFixed(0)}</strong><small>{baoOnly(dingxing)}包</small><small className="pov-breakdown">{breakdownText(dingxingByColor)}</small></div>
-          <div className="prod-overview-card" onClick={() => navigate("/warehouse")}><div className="pov-icon"><GridFour size={22} /></div><span>产品中心</span><strong>管理</strong><small>翻袜/缝头/定型</small></div>
+          <div className="prod-overview-card" onClick={() => navigate("/fanwa")}><div className="pov-icon"><Factory size={22} /></div><span>翻袜</span><strong>{baoOnly(fanwa)}包</strong><small>¥{sumAmt(fanwa).toFixed(0)}</small><small className="pov-breakdown">{breakdownText(fanwaByName)}</small></div>
+          <div className="prod-overview-card" onClick={() => navigate("/fengtou")}><div className="pov-icon"><Factory size={22} /></div><span>缝头</span><strong>{baoOnly(fengtou)}包</strong><small>¥{sumAmt(fengtou).toFixed(0)}</small><small className="pov-breakdown">{breakdownText(fengtouByName)}</small></div>
+          <div className="prod-overview-card" onClick={() => navigate("/dingxing")}><div className="pov-icon"><Factory size={22} /></div><span>定型</span><strong>{baoOnly(dingxing)}包</strong><small>¥{sumAmt(dingxing).toFixed(0)}</small><small className="pov-breakdown">{breakdownText(dingxingByColor)}</small></div>
           <div className="prod-overview-card" onClick={() => navigate("/warehouse")}><div className="pov-icon"><Package size={22} /></div><span>仓库余量</span><strong>{finishedInventory.length}项</strong><small>{warehouseColorText}</small></div>
         </div>
       </Section>

@@ -61,12 +61,12 @@ describe("仓库管理页面", () => {
     seedFinishedInventory();
     render(<WarehousePage />);
     const text = document.body.textContent || "";
-    // 白色: 10入 - 3出 = 7公斤
+    // 白色: 10入 - 3出 = 7包
     expect(text).toContain("白色");
-    expect(text).toContain("7公斤");
-    // 黑色: 5入 = 5公斤
+    expect(text).toContain("7包");
+    // 黑色: 5入 = 5包
     expect(text).toContain("黑色");
-    expect(text).toContain("5公斤");
+    expect(text).toContain("5包");
   });
 
   it("入库出库记录显示类型标签", () => {
@@ -110,7 +110,7 @@ describe("仓库管理页面", () => {
     fireEvent.click(screen.getByRole("button", { name: /入库/ }));
     const modal = screen.getByRole("dialog");
     expect(within(modal).getAllByRole("combobox").length).toBeGreaterThan(0);
-    expect(document.body.textContent).toContain("数量(公斤)");
+    expect(document.body.textContent).toContain("数量(包)");
   });
 
   it("点击出库打开弹窗并预选出库类型", () => {
@@ -147,8 +147,8 @@ describe("仓库管理页面", () => {
     seedDingxing();
     seedFinishedInventory();
     render(<WarehousePage />);
-    // 10 + 5 - 3 = 12 公斤
-    expect(document.body.textContent).toContain("12 公斤");
+    // 10 + 5 - 3 = 12 包
+    expect(document.body.textContent).toContain("12 包");
   });
 
   it("库存余量按颜色和规格分别显示", () => {
@@ -157,12 +157,12 @@ describe("仓库管理页面", () => {
     render(<WarehousePage />);
     const text = document.body.textContent || "";
     expect(text).toContain("按颜色和规格");
-    // dx1: 白色-双, 入库10出库3 = 7公斤
+    // dx1: 白色-双, 入库10出库3 = 7包
     expect(text).toContain("白色");
-    expect(text).toContain("7公斤");
-    // dx2: 黑色-包, 入库5 = 5公斤
+    expect(text).toContain("7包");
+    // dx2: 黑色-包, 入库5 = 5包
     expect(text).toContain("黑色");
-    expect(text).toContain("5公斤");
+    expect(text).toContain("5包");
   });
 
   it("出入库记录显示颜色和规格列", () => {
