@@ -2162,6 +2162,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 .prod-overview-card span { font-size: 13px; color: var(--text-secondary, #666); }
 .prod-overview-card strong { font-size: 28px; font-weight: 700; }
 .prod-overview-card small { font-size: 12px; color: #999; }
+.prod-overview-card .pov-breakdown { font-size: 11px; color: #aaa; display: block; margin-top: 2px; line-height: 1.4; word-break: break-all; }
 @media (max-width: 768px) {
   .prod-overview-grid { grid-template-columns: repeat(2, 1fr); }
 }

@@ -59,31 +59,34 @@ describe("首页总览", () => {
     expect(screen.queryByText("已安排")).not.toBeInTheDocument();
   });
 
-  it("生产卡片显示金额为主，数量为辅", () => {
+  it("生产卡片显示金额为主，数量按包并按姓名/颜色分组", () => {
     window.localStorage.setItem("sock-erp-fanwa", JSON.stringify([
-      { id: "1", name: "甲", spec: "双", quantity: 10, unitPrice: 5 },
+      { id: "1", name: "甲", spec: "包", quantity: 10, unitPrice: 5 },
+      { id: "2", name: "乙", spec: "包", quantity: 5, unitPrice: 5 },
     ]));
     window.localStorage.setItem("sock-erp-fengtou", JSON.stringify([
-      { id: "1", name: "乙", spec: "双", quantity: 20, unitPrice: 3 },
+      { id: "1", name: "丙", spec: "包", quantity: 20, unitPrice: 3 },
     ]));
     window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
-      { id: "1", name: "丙", color: "白色", spec: "双", quantity: 15, unitPrice: 4 },
+      { id: "1", name: "丁", color: "白色", spec: "包", quantity: 15, unitPrice: 4 },
     ]));
 
     renderDashboard();
     const text = document.body.textContent || "";
-    expect(text).toContain("¥50");
+    expect(text).toContain("¥75");
     expect(text).toContain("¥60");
-    expect(text).toContain("数量 10双");
-    expect(text).toContain("数量 20双");
-    expect(text).toContain("数量 15双");
+    expect(text).toContain("15包");
+    expect(text).toContain("20包");
+    expect(text).toContain("甲:10包");
+    expect(text).toContain("乙:5包");
+    expect(text).toContain("白色:15包");
   });
 
-  it("无数据时生产卡片显示0元", () => {
+  it("无数据时生产卡片显示0元0包", () => {
     renderDashboard();
     const text = document.body.textContent || "";
     expect(text).toContain("¥0");
-    expect(text).toContain("数量 0");
+    expect(text).toContain("0包");
   });
 
   it("显示生产数据总览标题", () => {
