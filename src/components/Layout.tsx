@@ -29,10 +29,10 @@ const groups = [
     { to: "/consulting", label: "仓库管理", module: "consulting", tone: "amber" },
     { to: "/customer", label: "客户中心", module: "consulting", tone: "coral" },
     { to: "/category", label: "分类中心", module: "fitness", tone: "apricot" },
+    { to: "/diet", label: "库存盘点", module: "diet", tone: "apricot" },
   ] },
   { label: "支出管理", links: [
     { to: "/fitness", label: "原材料采购", module: "fitness", tone: "sage" },
-    { to: "/diet", label: "库存盘点", module: "diet", tone: "apricot" },
     { to: "/entertainment", label: "机器损耗", module: "entertainment", tone: "indigo" },
     { to: "/sales-order", label: "运货运费", module: "diet", tone: "sky" },
     { to: "/salary", label: "工资支出", module: "fitness", tone: "sage" },
@@ -264,7 +264,7 @@ function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) 
 
 function QuickCreateModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
-  const options = [
+  const allOptions = [
     { label: "本月事项", detail: "安排本月要执行的事情", route: "/today?new=1", tone: "cyan", module: "today" },
     { label: "翻袜记录", detail: "记录翻袜生产", route: "/fanwa", tone: "coral", module: "today" },
     { label: "缝头记录", detail: "记录缝头生产", route: "/fengtou", tone: "teal", module: "media" },
@@ -275,10 +275,48 @@ function QuickCreateModal({ open, onClose }: { open: boolean; onClose: () => voi
     { label: "机器损耗", detail: "记录机器损耗支出", route: "/entertainment", tone: "indigo", module: "entertainment" },
     { label: "运货运费", detail: "记录运费支出", route: "/sales-order", tone: "sky", module: "diet" },
     { label: "工资支出", detail: "记录工资支出", route: "/salary", tone: "sage", module: "fitness" },
+    { label: "货款收入", detail: "记录货款收入", route: "/payment-income", tone: "sage", module: "dashboard" },
+    { label: "库存盘点", detail: "盘点库存", route: "/diet", tone: "apricot", module: "diet" },
   ];
+  const [customize, setCustomize] = useState(false);
+  const [selected, setSelected] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("sock-erp-quick-create");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch { /* ignore */ }
+    return allOptions.map((o) => o.label);
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("sock-erp-quick-create", JSON.stringify(selected)); } catch { /* ignore */ }
+  }, [selected]);
+
+  const visibleOptions = allOptions.filter((o) => selected.includes(o.label));
+
+  const toggleOption = (label: string) => {
+    setSelected((prev) => prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]);
+  };
+
   return (
-    <Modal open={open} title="快速新增" description="选择要记录的内容类型" onClose={onClose}>
-      <div className="quick-grid">{options.map((option) => <button data-tone={option.tone} key={option.label} onClick={() => { navigate(option.route); onClose(); }}><span className="quick-option-icon"><ModuleArtwork module={option.module as ModuleArtworkName} /></span><div><Badge>{option.label}</Badge><p>{option.detail}</p></div><ArrowRight size={18} /></button>)}</div>
+    <Modal open={open} title="快速新增" description={customize ? "勾选要显示的快捷入口" : "选择要记录的内容类型"} onClose={onClose}>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <Button variant="ghost" size="sm" onClick={() => setCustomize(!customize)}>{customize ? "完成" : "自定义"}</Button>
+      </div>
+      {customize ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {allOptions.map((option) => (
+            <label key={option.label} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, cursor: "pointer", background: selected.includes(option.label) ? "rgba(59,130,246,0.08)" : "transparent" }}>
+              <input type="checkbox" checked={selected.includes(option.label)} onChange={() => toggleOption(option.label)} />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <div className="quick-grid">{visibleOptions.map((option) => <button data-tone={option.tone} key={option.label} onClick={() => { navigate(option.route); onClose(); }}><span className="quick-option-icon"><ModuleArtwork module={option.module as ModuleArtworkName} /></span><div><Badge>{option.label}</Badge><p>{option.detail}</p></div><ArrowRight size={18} /></button>)}</div>
+      )}
     </Modal>
   );
 }
