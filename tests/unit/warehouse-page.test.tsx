@@ -39,8 +39,13 @@ describe("仓库管理页面", () => {
     expect(screen.getByRole("heading", { name: "仓库管理", level: 1 })).toBeInTheDocument();
   });
 
-  it("显示入库和出库按钮", () => {
+  it("成品标签页只显示出库按钮(定型自动入库)，原材料显示入库和出库", () => {
     render(<WarehousePage />);
+    // 成品标签页：入库按钮隐藏，出库按钮显示
+    expect(screen.queryByRole("button", { name: /入库/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /出库/ })).toBeInTheDocument();
+    // 切换到原材料标签页
+    fireEvent.click(screen.getByRole("tab", { name: /原材料库存/ }));
     expect(screen.getByRole("button", { name: /入库/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /出库/ })).toBeInTheDocument();
   });
@@ -56,17 +61,17 @@ describe("仓库管理页面", () => {
     expect(document.body.textContent).toContain("公斤");
   });
 
-  it("成品库存按颜色显示余量", () => {
+  it("成品库存按颜色显示余量(定型自动入库)", () => {
     seedDingxing();
     seedFinishedInventory();
     render(<WarehousePage />);
     const text = document.body.textContent || "";
-    // 白色: 10入 - 3出 = 7包
+    // 白色: 定型100 - 出库3 = 97
     expect(text).toContain("白色");
-    expect(text).toContain("7包");
-    // 黑色: 5入 = 5包
+    expect(text).toContain("97");
+    // 黑色: 定型50 - 0 = 50
     expect(text).toContain("黑色");
-    expect(text).toContain("5包");
+    expect(text).toContain("50");
   });
 
   it("入库出库记录显示类型标签", () => {
@@ -104,9 +109,10 @@ describe("仓库管理页面", () => {
     expect(screen.getByText("暂无原材料库存记录")).toBeInTheDocument();
   });
 
-  it("点击入库打开弹窗", () => {
-    seedDingxing();
+  it("点击入库打开弹窗(原材料标签页)", () => {
+    seedRawMaterials();
     render(<WarehousePage />);
+    fireEvent.click(screen.getByRole("tab", { name: /原材料库存/ }));
     fireEvent.click(screen.getByRole("button", { name: /入库/ }));
     const modal = screen.getByRole("dialog");
     expect(within(modal).getAllByRole("combobox").length).toBeGreaterThan(0);
@@ -144,26 +150,26 @@ describe("仓库管理页面", () => {
     expect(saved[0].type).toBe("in");
   });
 
-  it("当前总余量计算正确（入库减出库）", () => {
+  it("当前总余量计算正确（定型自动入库减出库）", () => {
     seedDingxing();
     seedFinishedInventory();
     render(<WarehousePage />);
-    // 10 + 5 - 3 = 12包, 0公斤
-    expect(document.body.textContent).toContain("12包");
+    // 包数: 定型100+50=150 - 出库3 = 147, 公斤数: 0
+    expect(document.body.textContent).toContain("147");
     expect(document.body.textContent).toContain("0公斤");
   });
 
-  it("成品库存余量按颜色汇总显示", () => {
+  it("成品库存余量按颜色汇总显示(定型自动入库)", () => {
     seedDingxing();
     seedFinishedInventory();
     render(<WarehousePage />);
     const text = document.body.textContent || "";
     expect(text).toContain("按颜色");
-    // dx1: 白色-双, 入库10出库3 = 7包; dx2: 黑色-包, 入库5 = 5包
+    // dx1: 白色-双, 定型100出库3 = 97; dx2: 黑色-包, 定型50 = 50
     expect(text).toContain("白色");
-    expect(text).toContain("7包");
+    expect(text).toContain("97");
     expect(text).toContain("黑色");
-    expect(text).toContain("5包");
+    expect(text).toContain("50");
   });
 
   it("出入库记录显示颜色和规格列", () => {
@@ -177,7 +183,7 @@ describe("仓库管理页面", () => {
     expect(text).toContain("包");
   });
 
-  it("库存余量同时显示包数和公斤数", () => {
+  it("库存余量同时显示包数和公斤数(定型自动入库)", () => {
     window.localStorage.setItem("sock-erp-finished-inventory", JSON.stringify([
       { id: "fi1", linkedId: "dx1", quantity: 10, weightKg: 20, note: "", type: "in", date: "2024-01-01" },
       { id: "fi2", linkedId: "dx1", quantity: 3, weightKg: 6, note: "", type: "out", date: "2024-01-02" },
@@ -185,8 +191,8 @@ describe("仓库管理页面", () => {
     seedDingxing();
     render(<WarehousePage />);
     const text = document.body.textContent || "";
-    // 10-3=7包, 20-6=14公斤
-    expect(text).toContain("7包");
+    // 包数: 定型100 - 出库3 = 97, 公斤数: 入库20 - 出库6 = 14
+    expect(text).toContain("97");
     expect(text).toContain("14公斤");
   });
 

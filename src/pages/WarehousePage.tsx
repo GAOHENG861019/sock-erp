@@ -142,19 +142,49 @@ export function WarehousePage() {
   }
 
   // 按颜色+规格计算当前库存余量（包数和公斤数）
+  // 成品：定型自动入库，余量 = 定型总数 - 出库数
+  // 原材料：余量 = 入库数 - 出库数
   const balanceByColorSpec = useMemo(() => {
     const groups: Record<string, { packages: number; weightKg: number }> = {};
-    currentList.forEach((item) => {
-      const color = getColor(activeTab, item.linkedId);
-      const spec = getSpec(activeTab, item.linkedId);
-      const key = `${color}|${spec}`;
-      const pkgs = getItemPackages(activeTab, item);
-      const kg = getItemWeightKg(activeTab, item);
-      const sign = item.type === "out" ? -1 : 1;
-      if (!groups[key]) groups[key] = { packages: 0, weightKg: 0 };
-      groups[key].packages += sign * pkgs;
-      groups[key].weightKg += sign * kg;
-    });
+
+    if (activeTab === "finished") {
+      // 成品：包数从定型自动入库，公斤数从入库减出库（定型无重量数据）
+      dingxingList.forEach((d) => {
+        const color = d.color || "未分类";
+        const spec = d.spec || "未分类";
+        const key = `${color}|${spec}`;
+        if (!groups[key]) groups[key] = { packages: 0, weightKg: 0 };
+        groups[key].packages += Number(d.quantity || 0);
+      });
+      // 出入库记录：包数只减出库，公斤数入库减出库
+      currentList.forEach((item) => {
+        const color = getColor(activeTab, item.linkedId);
+        const spec = getSpec(activeTab, item.linkedId);
+        const key = `${color}|${spec}`;
+        const pkgs = getItemPackages(activeTab, item);
+        const kg = getItemWeightKg(activeTab, item);
+        if (!groups[key]) groups[key] = { packages: 0, weightKg: 0 };
+        if (item.type === "out") {
+          groups[key].packages -= pkgs;
+          groups[key].weightKg -= kg;
+        } else {
+          groups[key].weightKg += kg;
+        }
+      });
+    } else {
+      // 原材料：入库 - 出库
+      currentList.forEach((item) => {
+        const color = getColor(activeTab, item.linkedId);
+        const spec = getSpec(activeTab, item.linkedId);
+        const key = `${color}|${spec}`;
+        const pkgs = getItemPackages(activeTab, item);
+        const kg = getItemWeightKg(activeTab, item);
+        const sign = item.type === "out" ? -1 : 1;
+        if (!groups[key]) groups[key] = { packages: 0, weightKg: 0 };
+        groups[key].packages += sign * pkgs;
+        groups[key].weightKg += sign * kg;
+      });
+    }
     return groups;
   }, [currentList, activeTab, dingxingList, rawMaterialList]);
 
@@ -247,10 +277,10 @@ export function WarehousePage() {
         icon={<ModuleArtwork module="consulting" />}
         eyebrow="仓库与商品"
         title="仓库管理"
-        description="管理成品库存(包)和原材料库存(公斤)，支持入库出库，关联定型和原材料采购数据。"
+        description="成品库存关联定型自动入库(包)，原材料库存(公斤)支持入库出库，关联定型和原材料采购数据。"
         actions={
           <div style={{ display: "flex", gap: 8 }}>
-            <Button onClick={() => openAdd("in")}><ArrowDown size={17} />入库</Button>
+            {activeTab !== "finished" && <Button onClick={() => openAdd("in")}><ArrowDown size={17} />入库</Button>}
             <Button variant="secondary" onClick={() => openAdd("out")}><ArrowUp size={17} />出库</Button>
           </div>
         }
