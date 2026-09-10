@@ -151,6 +151,46 @@ export function CategoryPage() {
   const finishedBalance = useMemo(() => calcFinishedBalance(finishedInventory), [finishedInventory]);
   const materialBalance = useMemo(() => calcMaterialBalance(materialInventory), [materialInventory]);
 
+  // 按颜色（商品）或名称（原材料）分组分类
+  const groupedCategories = useMemo(() => {
+    const groups: Record<string, Category[]> = {};
+    sortedList.forEach((cat) => {
+      let key = "未分类";
+      if (cat.linkedId) {
+        if (activeType === "product") {
+          const d = dingxingList.find((x) => x.id === cat.linkedId);
+          key = d?.color || "未分类";
+        } else {
+          const r = rawMaterialList.find((x) => x.id === cat.linkedId);
+          key = r?.name || "未分类";
+        }
+      }
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(cat);
+    });
+    return groups;
+  }, [sortedList, activeType, dingxingList, rawMaterialList]);
+
+  // 计算每个分组的总包数和公斤数
+  const groupTotals = useMemo(() => {
+    const totals: Record<string, { packages: number; weightKg: number }> = {};
+    Object.entries(groupedCategories).forEach(([key, cats]) => {
+      let packages = 0;
+      let weightKg = 0;
+      cats.forEach((cat) => {
+        if (cat.linkedId) {
+          const bal = activeType === "product" ? finishedBalance[cat.linkedId] : materialBalance[cat.linkedId];
+          if (bal) {
+            packages += bal.packages;
+            weightKg += bal.weightKg;
+          }
+        }
+      });
+      totals[key] = { packages, weightKg };
+    });
+    return totals;
+  }, [groupedCategories, activeType, finishedBalance, materialBalance]);
+
   const dingxingOptions = useMemo(
     () => [
       { value: "", label: "不关联" },
@@ -320,42 +360,56 @@ export function CategoryPage() {
         ))}
       </div>
 
-      <Section title={TYPE_META[activeType].label} description={`共 ${currentList.length} 个分类，拖拽可调整顺序`}>
+      <Section title={TYPE_META[activeType].label} description={`共 ${currentList.length} 个分类，按${activeType === "product" ? "颜色" : "名称"}分组，拖拽可调整顺序`}>
         {sortedList.length === 0 ? (
           <EmptyState title="暂无分类" description={TYPE_META[activeType].emptyText} />
         ) : (
-          <div className="category-list">
-            {sortedList.map((cat, idx) => (
-              <div
-                key={cat.id}
-                className={`category-item glass-clear ${draggedId === cat.id ? "category-dragging" : ""} ${dragOverId === cat.id && draggedId !== cat.id ? "category-drag-over" : ""}`}
-                draggable
-                onDragStart={(e) => handleDragStart(e, cat.id)}
-                onDragOver={(e) => handleDragOver(e, cat.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, cat.id)}
-                onDragEnd={handleDragEnd}
-              >
-                <div className="category-drag-handle" title="拖拽排序">
-                  <DotsSixVertical size={18} />
-                </div>
-                <div className="category-item-main">
-                  <span className="category-sort">{idx + 1}</span>
-                  <div>
-                    <div className="category-name">{cat.name}</div>
-                    {cat.description ? <div className="category-desc">{cat.description}</div> : null}
-                    {(() => {
-                      const linkedText = getLinkedText(cat);
-                      return linkedText ? <div className="category-desc">关联：{linkedText}</div> : null;
-                    })()}
+          <div>
+            {Object.entries(groupedCategories).map(([groupKey, cats]) => {
+              const total = groupTotals[groupKey];
+              return (
+                <div key={groupKey} style={{ marginBottom: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: "#f8f9fa", borderRadius: 8, marginBottom: 8 }}>
+                    <strong style={{ fontSize: 15 }}>{groupKey}</strong>
+                    <span style={{ fontSize: 13, color: "#666" }}>{cats.length} 个分类</span>
+                    <span style={{ marginLeft: "auto", fontSize: 13, color: "#3498db" }}>{total.packages}包 / {total.weightKg}公斤</span>
+                  </div>
+                  <div className="category-list">
+                    {cats.map((cat, idx) => (
+                      <div
+                        key={cat.id}
+                        className={`category-item glass-clear ${draggedId === cat.id ? "category-dragging" : ""} ${dragOverId === cat.id && draggedId !== cat.id ? "category-drag-over" : ""}`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, cat.id)}
+                        onDragOver={(e) => handleDragOver(e, cat.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, cat.id)}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <div className="category-drag-handle" title="拖拽排序">
+                          <DotsSixVertical size={18} />
+                        </div>
+                        <div className="category-item-main">
+                          <span className="category-sort">{sortedList.findIndex(c => c.id === cat.id) + 1}</span>
+                          <div>
+                            <div className="category-name">{cat.name}</div>
+                            {cat.description ? <div className="category-desc">{cat.description}</div> : null}
+                            {(() => {
+                              const linkedText = getLinkedText(cat);
+                              return linkedText ? <div className="category-desc">关联：{linkedText}</div> : null;
+                            })()}
+                          </div>
+                        </div>
+                        <div className="category-item-actions">
+                          <button className="icon-btn" onClick={() => openEdit(cat)} aria-label="编辑"><Pencil size={16} /></button>
+                          <button className="icon-btn danger" onClick={() => setDeleteTarget(cat)} aria-label="删除"><Trash size={16} /></button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="category-item-actions">
-                  <button className="icon-btn" onClick={() => openEdit(cat)} aria-label="编辑"><Pencil size={16} /></button>
-                  <button className="icon-btn danger" onClick={() => setDeleteTarget(cat)} aria-label="删除"><Trash size={16} /></button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Section>
