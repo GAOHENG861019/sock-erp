@@ -214,12 +214,19 @@ export function WarehousePage() {
     if (editing) {
       const idx = list.findIndex((i) => i.id === editing.id);
       if (idx >= 0) list[idx] = { ...list[idx], linkedId: formLinkedId, quantity, packages, weightKg, note, type: txnType, date: formDate };
+      updateList(activeTab, list);
+      setModalOpen(false);
+      setEditing(null);
     } else {
       list.push({ id: genId(), linkedId: formLinkedId, quantity, packages, weightKg, note, type: txnType, date: formDate });
+      updateList(activeTab, list);
+      // 连续输入：重置表单，保持弹窗打开
+      setFormLinkedId("");
+      setFormQuantity("");
+      setFormPackages("");
+      setFormWeightKg("");
+      setFormNote("");
     }
-    updateList(activeTab, list);
-    setModalOpen(false);
-    setEditing(null);
   }
 
   function confirmDelete() {

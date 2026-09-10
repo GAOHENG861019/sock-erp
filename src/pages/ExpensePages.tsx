@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash, Calculator, Download } from "@phosphor-icons/react";
 import { PageHeader, Section, Button, EmptyState } from "../components/ui";
 import { ModuleArtwork, type ModuleArtworkName } from "../components/ModuleArtwork";
@@ -29,6 +29,7 @@ export function ExpenseRecordPage({
 }) {
   const [items, setItems] = useLocalStorage<ExpenseItem[]>(storageKey, []);
   const [draft, setDraft] = useState<ExpenseItem>({ id: "", date: new Date().toISOString().slice(0, 10), amount: 0, note: "" });
+  const noteInputRef = useRef<HTMLInputElement>(null);
 
   const total = useMemo(() => items.reduce((s, i) => s + Number(i.amount || 0), 0), [items]);
 
@@ -36,6 +37,7 @@ export function ExpenseRecordPage({
     if (!draft.amount || draft.amount <= 0) return;
     setItems((prev) => [...prev, { ...draft, id: genId() }]);
     setDraft({ id: "", date: new Date().toISOString().slice(0, 10), amount: 0, note: "" });
+    setTimeout(() => noteInputRef.current?.focus(), 0);
   };
   const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
 
@@ -53,7 +55,7 @@ export function ExpenseRecordPage({
       <Section title="录入支出" description="填写日期、用途和金额，可上传凭证照片">
         <div className="production-input-row">
           <input className="prod-input" type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
-          <input className="prod-input" placeholder="用途" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} style={{ minWidth: 180 }} />
+          <input ref={noteInputRef} className="prod-input" placeholder="用途" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} style={{ minWidth: 180 }} />
           <input className="prod-input prod-num" type="number" min="0" step="0.01" placeholder="金额" value={draft.amount || ""} onChange={(e) => setDraft({ ...draft, amount: Number(e.target.value) || 0 })} />
           <label style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", fontSize: 13, color: "#666" }}>
             <input type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
@@ -100,6 +102,7 @@ export type IncomeItem = {
 export function PaymentIncomePage() {
   const [items, setItems] = useLocalStorage<IncomeItem[]>("sock-erp-payment-income", []);
   const [draft, setDraft] = useState<IncomeItem>({ id: "", date: new Date().toISOString().slice(0, 10), customer: "", amount: 0, note: "" });
+  const customerInputRef = useRef<HTMLInputElement>(null);
 
   const total = useMemo(() => items.reduce((s, i) => s + Number(i.amount || 0), 0), [items]);
 
@@ -107,6 +110,7 @@ export function PaymentIncomePage() {
     if (!draft.amount || draft.amount <= 0) return;
     setItems((prev) => [...prev, { ...draft, id: genId() }]);
     setDraft({ id: "", date: new Date().toISOString().slice(0, 10), customer: "", amount: 0, note: "" });
+    setTimeout(() => customerInputRef.current?.focus(), 0);
   };
   const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
 
@@ -124,7 +128,7 @@ export function PaymentIncomePage() {
       <Section title="录入收入" description="填写日期、客户、金额和备注，可上传凭证照片">
         <div className="production-input-row">
           <input className="prod-input" type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
-          <input className="prod-input" placeholder="客户名称" value={draft.customer} onChange={(e) => setDraft({ ...draft, customer: e.target.value })} style={{ minWidth: 140 }} />
+          <input ref={customerInputRef} className="prod-input" placeholder="客户名称" value={draft.customer} onChange={(e) => setDraft({ ...draft, customer: e.target.value })} style={{ minWidth: 140 }} />
           <input className="prod-input" placeholder="备注" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} style={{ minWidth: 140 }} />
           <input className="prod-input prod-num" type="number" min="0" step="0.01" placeholder="金额" value={draft.amount || ""} onChange={(e) => setDraft({ ...draft, amount: Number(e.target.value) || 0 })} />
           <label style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", fontSize: 13, color: "#666" }}>

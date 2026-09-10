@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash, Calculator, Pencil, X } from "@phosphor-icons/react";
 import { PageHeader, Section, Button, EmptyState, Modal } from "../components/ui";
 import { ModuleArtwork, type ModuleArtworkName } from "../components/ModuleArtwork";
@@ -60,6 +60,7 @@ export function ProductionRecordPage({
   const [items, setItems] = useLocalStorage<ProductionItem[]>(storageKey, []);
   const [draft, setDraft] = useState<ProductionItem>({ id: "", name: "", spec: "包", quantity: 0, unitPrice: 0, date: new Date().toISOString().slice(0, 10) });
   const [editing, setEditing] = useState<ProductionItem | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const nameGroups = useMemo(() => {
     const groups: Record<string, ProductionItem[]> = {};
@@ -75,6 +76,7 @@ export function ProductionRecordPage({
     if (!draft.name.trim()) return;
     setItems((prev) => [...prev, { ...draft, id: genId() }]);
     setDraft({ id: "", name: "", spec: "包", quantity: 0, unitPrice: 0, date: new Date().toISOString().slice(0, 10) });
+    setTimeout(() => nameInputRef.current?.focus(), 0);
   };
 
   const removeItem = (id: string) => setItems((prev) => prev.filter((item) => item.id !== id));
@@ -91,7 +93,7 @@ export function ProductionRecordPage({
       <Section title="录入记录" description="填写日期、姓名、规格(双/包)、数量和单价，合计自动计算">
         <div className="production-input-row">
           <input className="prod-input" type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
-          <input className="prod-input" placeholder="姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <input ref={nameInputRef} className="prod-input" placeholder="姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <select className="prod-input" value={draft.spec} onChange={(e) => setDraft({ ...draft, spec: e.target.value as "包" | "双" })}>
             <option value="包">包</option>
             <option value="双">双</option>
@@ -170,6 +172,7 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
   const [draft, setDraft] = useState<ProductionItem & { color: string }>({ id: "", name: "", color: "白色", spec: "包", quantity: 0, unitPrice: 0, date: new Date().toISOString().slice(0, 10) });
   const [customColor, setCustomColor] = useState("");
   const [editing, setEditing] = useState<(ProductionItem & { color: string }) | null>(null);
+  const dxNameInputRef = useRef<HTMLInputElement>(null);
 
   const colorGroups = useMemo(() => {
     const groups: Record<string, (ProductionItem & { color: string })[]> = {};
@@ -185,6 +188,7 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
     if (!draft.name.trim()) return;
     setItems((prev) => [...prev, { ...draft, id: genId() }]);
     setDraft({ id: "", name: "", color: "白色", spec: "包", quantity: 0, unitPrice: 0, date: new Date().toISOString().slice(0, 10) });
+    setTimeout(() => dxNameInputRef.current?.focus(), 0);
   };
 
   const removeItem = (id: string) => setItems((prev) => prev.filter((item) => item.id !== id));
@@ -203,7 +207,7 @@ export function DingxingPage({ module }: { module: ModuleArtworkName }) {
       <Section title="录入记录" description="选择颜色或姓名，填写日期、规格(双/包)、数量和单价">
         <div className="production-input-row">
           <input className="prod-input" type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
-          <input className="prod-input" placeholder="姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+          <input ref={dxNameInputRef} className="prod-input" placeholder="姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <select className="prod-input" value={draft.color} onChange={(e) => setDraft({ ...draft, color: e.target.value })}>
             {allColors.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
