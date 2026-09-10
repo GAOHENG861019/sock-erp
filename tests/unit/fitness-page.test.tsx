@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { FitnessPage } from "../../src/pages/FitnessPage";
 
 beforeEach(() => {
@@ -49,5 +49,25 @@ describe("原材料采购", () => {
     const text = document.body.textContent || "";
     expect(text).toContain("原材料总额度");
     expect(text).toContain("¥300.00");
+  });
+
+  it("原材料包数显示和统计", () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "1", name: "棉纱", spec: "32支", weight: 10, unitPrice: 30, amount: 300, packages: 5 },
+      { id: "2", name: "橡筋", spec: "40支", weight: 5, unitPrice: 20, amount: 100, packages: 3 },
+    ]));
+    render(<FitnessPage />);
+    const text = document.body.textContent || "";
+    expect(text).toContain("总包数");
+    expect(text).toContain("8");
+    expect(text).toContain("5 包");
+    expect(text).toContain("3 包");
+  });
+
+  it("添加原材料弹窗包含包数字段", () => {
+    render(<FitnessPage />);
+    fireEvent.click(screen.getByText("添加原材料"));
+    const modal = screen.getByRole("dialog");
+    expect(within(modal).getByText("包数")).toBeInTheDocument();
   });
 });
