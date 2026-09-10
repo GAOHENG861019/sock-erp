@@ -87,6 +87,79 @@ export function ExpenseRecordPage({
   );
 }
 
+export type IncomeItem = {
+  id: string;
+  date: string;
+  customer: string;
+  amount: number;
+  note: string;
+  photo?: string;
+};
+
+/** 货款收入页 */
+export function PaymentIncomePage() {
+  const [items, setItems] = useLocalStorage<IncomeItem[]>("sock-erp-payment-income", []);
+  const [draft, setDraft] = useState<IncomeItem>({ id: "", date: new Date().toISOString().slice(0, 10), customer: "", amount: 0, note: "" });
+
+  const total = useMemo(() => items.reduce((s, i) => s + Number(i.amount || 0), 0), [items]);
+
+  const addItem = () => {
+    if (!draft.amount || draft.amount <= 0) return;
+    setItems((prev) => [...prev, { ...draft, id: genId() }]);
+    setDraft({ id: "", date: new Date().toISOString().slice(0, 10), customer: "", amount: 0, note: "" });
+  };
+  const removeItem = (id: string) => setItems((prev) => prev.filter((i) => i.id !== id));
+
+  const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setDraft({ ...draft, photo: reader.result as string });
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div>
+      <PageHeader icon={<ModuleArtwork module="dashboard" />} eyebrow="收入管理" title="货款收入" description="记录客户货款收入，支持客户名称、备注和凭证照片。" actions={<Button onClick={addItem}><Plus size={16} />添加收入</Button>} />
+      <Section title="录入收入" description="填写日期、客户、金额和备注，可上传凭证照片">
+        <div className="production-input-row">
+          <input className="prod-input" type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+          <input className="prod-input" placeholder="客户名称" value={draft.customer} onChange={(e) => setDraft({ ...draft, customer: e.target.value })} style={{ minWidth: 140 }} />
+          <input className="prod-input" placeholder="备注" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} style={{ minWidth: 140 }} />
+          <input className="prod-input prod-num" type="number" min="0" step="0.01" placeholder="金额" value={draft.amount || ""} onChange={(e) => setDraft({ ...draft, amount: Number(e.target.value) || 0 })} />
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", fontSize: 13, color: "#666" }}>
+            <input type="file" accept="image/*" onChange={handlePhoto} style={{ display: "none" }} />
+            📷 {draft.photo ? "已选" : "凭证"}
+          </label>
+          {draft.photo ? <img src={draft.photo} alt="预览" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 6 }} /> : null}
+          <span className="prod-total-inline">¥{draft.amount.toFixed(2)}</span>
+          <Button onClick={addItem}><Plus size={16} />添加</Button>
+        </div>
+      </Section>
+      {items.length ? (
+        <Section title="收入明细" description={`共 ${items.length} 条`}>
+          <table className="prod-table">
+            <thead><tr><th>日期</th><th>客户</th><th>备注</th><th>金额</th><th>凭证</th><th>操作</th></tr></thead>
+            <tbody>
+              {[...items].sort((a, b) => b.date.localeCompare(a.date)).map((item) => (
+                <tr key={item.id}>
+                  <td>{item.date}</td>
+                  <td><strong>{item.customer || "-"}</strong></td>
+                  <td>{item.note || "-"}</td>
+                  <td><strong style={{ color: "#27ae60" }}>¥{Number(item.amount).toFixed(2)}</strong></td>
+                  <td>{item.photo ? <img src={item.photo} alt="凭证" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6 }} /> : <span style={{ color: "#999", fontSize: 12 }}>无</span>}</td>
+                  <td><button className="icon-button danger-text" title="删除" onClick={() => removeItem(item.id)}><Trash size={16} /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="prod-summary prod-grand"><span><Calculator size={18} />收入合计：<strong>¥{total.toFixed(2)}</strong></span></div>
+        </Section>
+      ) : <EmptyState title="还没有收入记录" description="在上方填写日期、客户和金额后点击添加。" />}
+    </div>
+  );
+}
+
 /** 支出统计页：四类支出占比、时间段筛选、导出报表 */
 export function ExpenseStatsPage() {
   const [machine] = useLocalStorage<ExpenseItem[]>("sock-erp-machine-loss", []);

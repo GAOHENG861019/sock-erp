@@ -37,6 +37,7 @@ const groups = [
     { to: "/sales-order", label: "运货运费", module: "diet", tone: "sky" },
     { to: "/salary", label: "工资支出", module: "fitness", tone: "sage" },
     { to: "/expense-stats", label: "支出统计", module: "dashboard", tone: "sky" },
+    { to: "/payment-income", label: "货款收入", module: "dashboard", tone: "sage" },
   ] },
   { label: "审核中心", links: [
     { to: "/purchase-audit", label: "采购审核", module: "entertainment", tone: "indigo" },
@@ -72,6 +73,7 @@ const routeMeta: Record<string, { label: string; module: ModuleArtworkName; tone
   "/sales-order": { label: "运货运费", module: "diet", tone: "sky", index: "12" },
   "/salary": { label: "工资支出", module: "fitness", tone: "sage", index: "13" },
   "/expense-stats": { label: "支出统计", module: "dashboard", tone: "sky", index: "14" },
+  "/payment-income": { label: "货款收入", module: "dashboard", tone: "sage", index: "14b" },
   "/purchase-audit": { label: "采购审核", module: "entertainment", tone: "indigo", index: "15" },
   "/outbound-audit": { label: "出库审核", module: "dashboard", tone: "sky", index: "16" },
   "/sales-audit": { label: "销货审核", module: "media", tone: "coral", index: "17" },

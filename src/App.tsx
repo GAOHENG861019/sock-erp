@@ -3,7 +3,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AppLayout } from "./components/Layout";
 import { ErrorState, Skeleton } from "./components/ui";
 import { ProductionRecordPage, DingxingPage } from "./pages/ProductionRecordPage";
-import { ExpenseRecordPage, ExpenseStatsPage } from "./pages/ExpensePages";
+import { ExpenseRecordPage, ExpenseStatsPage, PaymentIncomePage } from "./pages/ExpensePages";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { CategoryPage } from "./pages/CategoryPage";
 import { MemberPage } from "./pages/MemberPage";
@@ -55,6 +55,7 @@ const router = createBrowserRouter([
       { path: "sales-order", element: <FreightPage /> },
       { path: "salary", element: <SalaryPage /> },
       { path: "expense-stats", element: <ExpenseStatsPage /> },
+      { path: "payment-income", element: <PaymentIncomePage /> },
       { path: "purchase-audit", element: <PurchaseAuditPage /> },
       { path: "outbound-audit", element: <OutboundAuditPage /> },
       { path: "sales-audit", element: <SalesAuditPage /> },
