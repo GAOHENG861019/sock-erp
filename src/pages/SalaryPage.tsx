@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash, Calculator, Users, Wallet, CaretDown, CaretRight } from "@phosphor-icons/react";
 import { PageHeader, Section, Button, EmptyState, Modal } from "../components/ui";
 import { ModuleArtwork } from "../components/ModuleArtwork";
@@ -99,10 +99,16 @@ export function SalaryPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [expandedName, setExpandedName] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<ExtraSalary>({
     id: "", name: "", amount: 0, note: "",
     date: new Date().toISOString().slice(0, 10),
   });
+
+  // 弹窗打开时自动聚焦姓名输入框
+  useEffect(() => {
+    if (modalOpen) setTimeout(() => nameInputRef.current?.focus(), 100);
+  }, [modalOpen]);
 
   // 按姓名分组汇总三个工序 + 额外工资
   const employees = useMemo<EmployeeRow[]>(() => {
@@ -171,7 +177,16 @@ export function SalaryPage() {
 
   const resetDraft = () => setDraft({ id: "", name: "", amount: 0, note: "", date: new Date().toISOString().slice(0, 10) });
 
+  // 保存并继续（不关闭弹窗，清空姓名/金额/备注，保留日期，聚焦姓名框）
   const addExtra = () => {
+    if (!draft.name.trim() || !draft.amount || draft.amount <= 0) return;
+    setExtras((prev) => [...prev, { ...draft, name: draft.name.trim() }]);
+    setDraft((prev) => ({ id: "", name: "", amount: 0, note: "", date: prev.date }));
+    setTimeout(() => nameInputRef.current?.focus(), 50);
+  };
+
+  // 保存并关闭
+  const addExtraAndClose = () => {
     if (!draft.name.trim() || !draft.amount || draft.amount <= 0) return;
     setExtras((prev) => [...prev, { ...draft, name: draft.name.trim() }]);
     resetDraft();
@@ -323,15 +338,15 @@ export function SalaryPage() {
         )}
       </Section>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="添加额外工资" description="录入奖金、补贴等，姓名与生产记录匹配时自动计入员工工资">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="添加额外工资" description="录入奖金、补贴等，姓名与生产记录匹配时自动计入员工工资。保存后可连续录入下一条。">
         <div className="form-grid">
           <label className="form-field">
             <span>姓名</span>
-            <input placeholder="员工姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            <input ref={nameInputRef} placeholder="员工姓名" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") addExtra(); }} />
           </label>
           <label className="form-field">
             <span>金额</span>
-            <input type="number" min="0" step="0.01" placeholder="金额(元)" value={draft.amount || ""} onChange={(e) => setDraft({ ...draft, amount: Number(e.target.value) || 0 })} />
+            <input type="number" min="0" step="0.01" placeholder="金额(元)" value={draft.amount || ""} onChange={(e) => setDraft({ ...draft, amount: Number(e.target.value) || 0 })} onKeyDown={(e) => { if (e.key === "Enter") addExtra(); }} />
           </label>
           <label className="form-field">
             <span>日期</span>
@@ -339,12 +354,13 @@ export function SalaryPage() {
           </label>
           <label className="form-field">
             <span>备注</span>
-            <input placeholder="如：奖金、全勤补贴" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
+            <input placeholder="如：奖金、全勤补贴" value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} onKeyDown={(e) => { if (e.key === "Enter") addExtra(); }} />
           </label>
         </div>
         <footer className="modal-actions">
           <Button variant="ghost" onClick={() => setModalOpen(false)}>取消</Button>
-          <Button onClick={addExtra}>保存</Button>
+          <Button variant="secondary" onClick={addExtraAndClose}>保存并关闭</Button>
+          <Button onClick={addExtra}>保存并继续</Button>
         </footer>
       </Modal>
     </div>
