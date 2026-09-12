@@ -3,10 +3,11 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   MagnifyingGlass, Plus, FloppyDisk, CheckCircle, WarningCircle, SidebarSimple,
-  ArrowRight, Command, Power,
+  ArrowRight, Command, Power, Cloud,
 } from "@phosphor-icons/react";
 import { api } from "../api";
 import { useWorkspace } from "../WorkspaceContext";
+import { useSyncStatus } from "../sync";
 import { formatDateTime, classNames } from "../utils";
 import { normalizeAppearance } from "../appearance";
 import { Button, IconButton, Modal, Skeleton, ErrorState, Badge } from "./ui";
@@ -83,6 +84,7 @@ const routeMeta: Record<string, { label: string; module: ModuleArtworkName; tone
 
 export function AppLayout() {
   const { data, saveNow, saveStatus } = useWorkspace();
+  const syncStatus = useSyncStatus();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -201,6 +203,20 @@ export function AppLayout() {
             <Button className="topbar-create" variant="secondary" size="sm" onClick={() => setQuickOpen(true)}><Plus size={16} />快速新建</Button>
             <Button className="manual-save" variant="secondary" size="sm" loading={saveStatus === "saving"} onClick={() => void saveNow().catch(() => undefined)}><FloppyDisk size={16} />手动保存</Button>
             <Button className="save-exit" variant="ghost" size="sm" loading={exitState === "saving"} disabled={exitState === "done"} onClick={() => void saveAndExit()}><Power size={16} />{exitState === "error" ? "退出失败，重试" : "保存并退出"}</Button>
+            <span
+              className="cloud-sync-indicator"
+              title={syncStatus === "syncing" ? "正在同步到云端" : syncStatus === "error" ? "云同步失败" : syncStatus === "offline" ? "离线模式" : "云端已同步"}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 12,
+                color: syncStatus === "syncing" ? "#3498db" : syncStatus === "error" ? "#e74c3c" : syncStatus === "offline" ? "#95a5a6" : "#27ae60",
+              }}
+            >
+              <Cloud size={16} weight={syncStatus === "syncing" ? "regular" : "fill"} />
+              {syncStatus === "syncing" ? "同步中" : syncStatus === "error" ? "同步失败" : syncStatus === "offline" ? "离线" : "已同步"}
+            </span>
             <SaveIndicator status={saveStatus} />
           </div>
         </header>
