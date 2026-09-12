@@ -2209,6 +2209,47 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
   border-top: 1px solid var(--border-color, #eee);
   padding-top: 10px;
 }
+
+/* === 工资卡片 === */
+.salary-card {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-color, #e8e8e8);
+  border-radius: 12px;
+  padding: 14px;
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+.salary-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+.salary-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color, #eee);
+}
+.salary-card-head strong { font-size: 16px; font-weight: 600; }
+.salary-card-total { font-size: 18px; font-weight: 700; color: #e74c3c; }
+.salary-card-body { margin-bottom: 10px; }
+.salary-card-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 3px 0;
+  color: var(--text-secondary, #666);
+}
+.salary-card-row span:first-child { font-weight: 500; color: #555; }
+.salary-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #3498db;
+  border-top: 1px solid var(--border-color, #eee);
+  padding-top: 8px;
+}
 @media (max-width: 768px) {
   .prod-overview-grid { grid-template-columns: repeat(2, 1fr); }
 }

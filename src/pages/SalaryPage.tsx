@@ -202,6 +202,30 @@ export function SalaryPage() {
       </div>
 
       {employees.length ? (
+        <>
+        <Section title="员工工资卡片" description="按姓名显示每位员工的工资明细">
+          <div className="prod-overview-grid">
+            {employees.map((e) => (
+              <div key={e.name} className="salary-card" style={{ cursor: "pointer" }} onClick={() => setExpandedName(expandedName === e.name ? null : e.name)}>
+                <div className="salary-card-head">
+                  <strong>{e.name}</strong>
+                  <span className="salary-card-total">¥{totalOf(e).toFixed(0)}</span>
+                </div>
+                <div className="salary-card-body">
+                  <div className="salary-card-row"><span>翻袜</span><span>{formatQty(e.fanwa)} · ¥{e.fanwa.amount.toFixed(0)}</span></div>
+                  <div className="salary-card-row"><span>缝头</span><span>{formatQty(e.fengtou)} · ¥{e.fengtou.amount.toFixed(0)}</span></div>
+                  <div className="salary-card-row"><span>定型</span><span>{formatQty(e.dingxing)} · ¥{e.dingxing.amount.toFixed(0)}</span></div>
+                  {e.extra > 0 && <div className="salary-card-row"><span>额外</span><span>¥{e.extra.toFixed(0)}</span></div>}
+                </div>
+                <div className="salary-card-foot">
+                  {expandedName === e.name ? <CaretDown size={14} /> : <CaretRight size={14} />}
+                  <span>{expandedName === e.name ? "收起每日产量" : "查看每日产量"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
         <Section title="员工工资明细" description="按工资合计降序排列，点击姓名展开查看每日产量">
           <table className="prod-table">
             <thead>
@@ -267,6 +291,7 @@ export function SalaryPage() {
             <span>共 <strong>{employees.length}</strong> 名员工</span>
           </div>
         </Section>
+        </>
       ) : (
         <EmptyState title="暂无生产记录" description="添加翻袜/缝头/定型记录后自动计算工资" />
       )}
