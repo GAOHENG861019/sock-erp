@@ -2430,6 +2430,10 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 .mobile-overlay { display: none; }
 
 @media (max-width: 768px) {
+  /* 移除桌面端最小宽度限制 */
+  body { min-width: 0; }
+  html, body { overflow-x: hidden; }
+
   /* 侧边栏：手机端隐藏，打开时作为抽屉滑入 */
   .mobile-menu-btn { display: inline-flex; }
   .desktop-collapse-btn { display: none; }
