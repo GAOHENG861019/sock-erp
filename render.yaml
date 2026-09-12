@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: sock-erp
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node scripts/start-server.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MUZI_DATA_DIR
+        value: /var/data
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1

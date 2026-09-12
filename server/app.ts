@@ -31,11 +31,19 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   const baiduBackups = new BaiduBackupManager(paths, backups);
   const app = Fastify({ logger: options.logger ?? false, bodyLimit: 2 * 1024 * 1024 });
 
+  // CORS - 内部应用允许所有来源访问
   app.addHook("onRequest", async (request, reply) => {
-    if (!["POST", "PATCH", "PUT", "DELETE"].includes(request.method)) return;
     const origin = request.headers.origin;
-    if (origin && !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) {
-      return reply.code(403).send({ error: { code: "INVALID_ORIGIN", message: "请求来源无效" } });
+    if (origin) {
+      reply.header("Access-Control-Allow-Origin", origin);
+      reply.header("Access-Control-Allow-Credentials", "true");
+    } else {
+      reply.header("Access-Control-Allow-Origin", "*");
+    }
+    reply.header("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS");
+    reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (request.method === "OPTIONS") {
+      return reply.code(204).send();
     }
   });
 

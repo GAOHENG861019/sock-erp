@@ -36,8 +36,8 @@ export function getAppPaths(override?: string): AppPaths {
   return paths;
 }
 
-export const APP_HOST = "127.0.0.1";
-export const APP_PORT = Number(process.env.MUZI_PORT ?? 4317);
+export const APP_HOST = process.env.HOST ?? process.env.MUZI_HOST ?? "0.0.0.0";
+export const APP_PORT = Number(process.env.PORT ?? process.env.MUZI_PORT ?? 4317);
 
 function defaultDataRoot(): string {
   if (process.platform === "win32") {
