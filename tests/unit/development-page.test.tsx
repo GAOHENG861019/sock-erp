@@ -55,4 +55,14 @@ describe("商品管理-去掉在售", () => {
     render(<MemoryRouter><DevelopmentPage /></MemoryRouter>);
     expect(screen.getByText("商品管理")).toBeInTheDocument();
   });
+
+  it("商品以卡片形式展示", () => {
+    render(<MemoryRouter><DevelopmentPage /></MemoryRouter>);
+    expect(screen.getByText("商品列表")).toBeInTheDocument();
+    expect(screen.getByText("棉袜")).toBeInTheDocument();
+    expect(screen.getByText("运动袜")).toBeInTheDocument();
+    // 卡片显示规格和供应商
+    expect(screen.getByText("规格：200针")).toBeInTheDocument();
+    expect(screen.getByText("供应商：XX纺织")).toBeInTheDocument();
+  });
 });
