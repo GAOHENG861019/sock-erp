@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   MagnifyingGlass, Plus, FloppyDisk, CheckCircle, WarningCircle, SidebarSimple,
-  ArrowRight, Command, Power, Cloud,
+  ArrowRight, Command, Power, Cloud, List,
 } from "@phosphor-icons/react";
 import { api } from "../api";
 import { useWorkspace } from "../WorkspaceContext";
@@ -89,6 +89,7 @@ export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [exitState, setExitState] = useState<"idle" | "saving" | "done" | "error">("idle");
   const system = useQuery({ queryKey: ["system"], queryFn: api.systemStatus, staleTime: 30_000 });
   const currentPage = routeMeta[location.pathname] ?? routeMeta["/"];
@@ -100,6 +101,10 @@ export function AppLayout() {
     document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.appearance = appearance;
   }, [appearance, theme]);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -164,13 +169,14 @@ export function AppLayout() {
 
   return (
     <div
-      className={classNames("app-shell", appearance === "neo" && "neo-shell", collapsed && "sidebar-collapsed")}
+      className={classNames("app-shell", appearance === "neo" && "neo-shell", collapsed && "sidebar-collapsed", mobileMenuOpen && "mobile-menu-open")}
       data-appearance={appearance}
       data-module={currentPage.module}
       data-ambient={ambientScene}
     >
       {appearance === "liquid" ? <AmbientEnvironment scene={ambientScene} /> : appearance === "notebook" ? <NotebookEnvironment /> : null}
       <a className="skip-link" href="#main-content">跳到主要内容</a>
+      {mobileMenuOpen ? <div className="mobile-overlay" onClick={() => setMobileMenuOpen(false)} /> : null}
       <aside className="sidebar glass-regular">
         <div className="brand"><div className="brand-mark" aria-hidden="true"><img src={appearance === "neo" ? "/assets/neo/muzi-app-icon-brand.png" : "/assets/brand/muzi-mark.svg"} alt="" draggable={false} /></div><div className="brand-copy"><strong>袜厂进销存ERP管理系统</strong><span>袜厂本地管理系统</span></div>{appearance === "neo" ? <span className="brand-edition">NEO / SOCK FACTORY ERP</span> : null}</div>
         <Button className="quick-create" onClick={() => setQuickOpen(true)}><Plus size={18} />快速新增</Button>
@@ -193,7 +199,8 @@ export function AppLayout() {
       <div className="app-main">
         <header className="topbar glass-clear">
           <div className="topbar-left">
-            <IconButton label={collapsed ? "展开导航" : "收起导航"} onClick={() => setCollapsed((value) => !value)}><SidebarSimple size={20} /></IconButton>
+            <IconButton label="菜单" className="mobile-menu-btn" onClick={() => setMobileMenuOpen(true)}><List size={20} /></IconButton>
+            <IconButton label={collapsed ? "展开导航" : "收起导航"} className="desktop-collapse-btn" onClick={() => setCollapsed((value) => !value)}><SidebarSimple size={20} /></IconButton>
             <span className="toolbar-page-icon" data-tone={currentPage.tone} aria-hidden="true"><ModuleArtwork module={currentPage.module} /></span>
             <div className="toolbar-context"><strong>{currentPage.label}</strong><span>{new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date())}</span></div>
             {appearance === "neo" ? <span className="topbar-index">{currentPage.index} / 19</span> : null}
@@ -221,6 +228,23 @@ export function AppLayout() {
           </div>
         </header>
         <main className="page-container" id="main-content" tabIndex={-1}><Outlet /></main>
+        <nav className="bottom-nav" aria-label="底部导航">
+          <NavLink to="/" end className={({ isActive }) => `bottom-nav-item ${isActive ? "active" : ""}`}>
+            <ModuleArtwork module="dashboard" /><span>首页</span>
+          </NavLink>
+          <NavLink to="/fanwa" className={({ isActive }) => `bottom-nav-item ${isActive ? "active" : ""}`}>
+            <ModuleArtwork module="today" /><span>翻袜</span>
+          </NavLink>
+          <NavLink to="/fengtou" className={({ isActive }) => `bottom-nav-item ${isActive ? "active" : ""}`}>
+            <ModuleArtwork module="media" /><span>缝头</span>
+          </NavLink>
+          <NavLink to="/dingxing" className={({ isActive }) => `bottom-nav-item ${isActive ? "active" : ""}`}>
+            <ModuleArtwork module="development" /><span>定型</span>
+          </NavLink>
+          <button className="bottom-nav-item" onClick={() => setMobileMenuOpen(true)}>
+            <List size={22} /><span>更多</span>
+          </button>
+        </nav>
       </div>
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
       <QuickCreateModal open={quickOpen} onClose={() => setQuickOpen(false)} />
