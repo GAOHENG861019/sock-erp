@@ -105,34 +105,39 @@ describe("本月总览数据卡片", () => {
     expect(screen.getByText("本月总览")).toBeInTheDocument();
   });
 
-  it("仓库余量按颜色显示", () => {
+  it("仓库余量按颜色显示包数和公斤数", () => {
     window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
       { id: "dx1", name: "A", color: "白色", spec: "包", quantity: 100, unitPrice: 5 },
       { id: "dx2", name: "B", color: "黑色", spec: "包", quantity: 50, unitPrice: 4 },
     ]));
     window.localStorage.setItem("sock-erp-finished-inventory", JSON.stringify([
-      { id: "fi1", linkedId: "dx1", quantity: 30, note: "" },
-      { id: "fi2", linkedId: "dx2", quantity: 20, note: "" },
+      { id: "fi1", linkedId: "dx1", quantity: 30, weightKg: 60, note: "", type: "in" },
+      { id: "fi2", linkedId: "dx2", quantity: 20, weightKg: 40, note: "", type: "in" },
     ]));
     renderToday();
     const text = document.body.textContent || "";
     expect(text).toContain("白色");
-    expect(text).toContain("30公斤");
+    expect(text).toContain("30包");
+    expect(text).toContain("60公斤");
     expect(text).toContain("黑色");
-    expect(text).toContain("20公斤");
-    expect(text).toContain("50公斤");
+    expect(text).toContain("20包");
+    expect(text).toContain("40公斤");
   });
 
-  it("仓库重量关联原材料按名称显示", () => {
+  it("仓库重量关联原材料按名称显示包数和总重量", () => {
     window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
-      { id: "1", name: "棉纱", spec: "", weight: 50, unitPrice: 40, amount: 2000 },
-      { id: "2", name: "涤纶", spec: "", weight: 30, unitPrice: 30, amount: 900 },
+      { id: "1", name: "棉纱", spec: "", weight: 50, unitPrice: 40, amount: 4000, packages: 2 },
+      { id: "2", name: "涤纶", spec: "", weight: 30, unitPrice: 30, amount: 2700, packages: 3 },
     ]));
     renderToday();
     const text = document.body.textContent || "";
     expect(text).toContain("仓库重量");
-    expect(text).toContain("80公斤");
+    // 棉纱: 2包, 2*50=100公斤; 涤纶: 3包, 3*30=90公斤; 总计: 5包, 190公斤
     expect(text).toContain("棉纱");
+    expect(text).toContain("2包");
+    expect(text).toContain("100");
     expect(text).toContain("涤纶");
+    expect(text).toContain("3包");
+    expect(text).toContain("90");
   });
 });

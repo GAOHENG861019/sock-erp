@@ -75,27 +75,34 @@ export function TodayPage() {
     });
     return groups;
   }, [dingxing]);
-  // 仓库余量：关联仓库管理（成品库存），按颜色统计公斤
+  // 仓库余量：关联仓库管理（成品库存），按颜色统计包数和公斤数（入库减出库）
   const finishedInv = readLS<any[]>("sock-erp-finished-inventory", []);
   const dxMap: Record<string, any> = {};
   dingxing.forEach((d) => { dxMap[d.id] = d; });
-  const warehouseByColor: Record<string, number> = {};
+  const warehouseByColor: Record<string, { bao: number; kg: number }> = {};
   finishedInv.forEach((inv) => {
     const dx = dxMap[inv.linkedId];
     const color = dx?.color || "未分类";
-    warehouseByColor[color] = (warehouseByColor[color] || 0) + Number(inv.quantity || 0);
+    if (!warehouseByColor[color]) warehouseByColor[color] = { bao: 0, kg: 0 };
+    const sign = inv.type === "out" ? -1 : 1;
+    warehouseByColor[color].bao += sign * Number(inv.quantity || 0);
+    warehouseByColor[color].kg += sign * Number(inv.weightKg || 0);
   });
-  const warehouseTotalKg = Object.values(warehouseByColor).reduce((s, v) => s + v, 0);
-  const warehouseColorText = Object.entries(warehouseByColor).map(([c, q]) => `${c}:${q}公斤`).join(" ") || "暂无库存";
-  // 仓库重量：关联库存盘点（原材料），按名称统计公斤
+  const warehouseTotalBao = Object.values(warehouseByColor).reduce((s, v) => s + v.bao, 0);
+  const warehouseTotalKg = Object.values(warehouseByColor).reduce((s, v) => s + v.kg, 0);
+  const warehouseColorText = Object.entries(warehouseByColor).map(([c, v]) => `${c}:${v.bao}包${v.kg}公斤`).join(" ") || "暂无库存";
+  // 仓库重量：关联原材料采购，按名称统计包数和总重量(包数×单重)
   const rawMaterials = readLS<any[]>("sock-erp-raw-materials", []);
-  const materialByName: Record<string, number> = {};
+  const materialByName: Record<string, { bao: number; kg: number }> = {};
   rawMaterials.forEach((m) => {
     const name = m.name || "未分类";
-    materialByName[name] = (materialByName[name] || 0) + Number(m.weight || 0);
+    if (!materialByName[name]) materialByName[name] = { bao: 0, kg: 0 };
+    materialByName[name].bao += Number(m.packages || 0);
+    materialByName[name].kg += Number(m.packages || 0) * Number(m.weight || 0);
   });
-  const materialTotalKg = Object.values(materialByName).reduce((s, v) => s + v, 0);
-  const materialText = Object.entries(materialByName).map(([n, w]) => `${n}:${w}公斤`).join(" ") || "暂无原材料";
+  const materialTotalBao = Object.values(materialByName).reduce((s, v) => s + v.bao, 0);
+  const materialTotalKg = Object.values(materialByName).reduce((s, v) => s + v.kg, 0);
+  const materialText = Object.entries(materialByName).map(([n, v]) => `${n}:${v.bao}包${v.kg.toFixed(1)}公斤`).join(" ") || "暂无原材料";
   // 支出收入
   const machineLoss = readLS<any[]>("sock-erp-machine-loss", []);
   const freight = readLS<any[]>("sock-erp-freight", []);
@@ -106,8 +113,8 @@ export function TodayPage() {
 
   const overviewCards = [
     { label: "成品数量", value: `${finishedBao}包`, color: "#3498db", icon: "📦" },
-    { label: "仓库余量", value: `${warehouseTotalKg}公斤`, color: "#2ecc71", icon: "🏭" },
-    { label: "仓库重量", value: `${materialTotalKg}公斤`, color: "#9b59b6", icon: "📊" },
+    { label: "仓库余量", value: `${warehouseTotalBao}包 ${warehouseTotalKg}公斤`, color: "#2ecc71", icon: "🏭" },
+    { label: "仓库重量", value: `${materialTotalBao}包 ${materialTotalKg.toFixed(0)}公斤`, color: "#9b59b6", icon: "📊" },
     { label: "本月支出", value: `¥${monthExpense.toFixed(0)}`, color: "#e74c3c", icon: "💸" },
     { label: "本月收入", value: `¥${monthIncome.toFixed(0)}`, color: "#f39c12", icon: "💰" },
   ];
@@ -140,29 +147,29 @@ export function TodayPage() {
           </div>
         ) : <p className="quiet-line">暂无定型记录</p>}
       </Section>
-      <Section title="仓库余量按颜色" description="关联仓库管理成品库存，按颜色分别显示">
+      <Section title="仓库余量按颜色" description="关联仓库管理成品库存，按颜色分别显示包数和公斤数">
         {Object.keys(warehouseByColor).length ? (
           <div className="prod-overview-grid">
-            {Object.entries(warehouseByColor).map(([color, kg]) => (
+            {Object.entries(warehouseByColor).map(([color, stats]) => (
               <div key={color} className="prod-overview-card">
                 <div className="pov-icon" style={{ background: "#2ecc7120", color: "#2ecc71" }}>🏭</div>
                 <span>{color}</span>
-                <strong>{kg}公斤</strong>
-                <small>成品库存</small>
+                <strong>{stats.bao}包</strong>
+                <small>{stats.kg}公斤</small>
               </div>
             ))}
           </div>
         ) : <p className="quiet-line">暂无仓库库存</p>}
       </Section>
-      <Section title="仓库重量按原材料" description="关联库存盘点，按原材料名称分别显示">
+      <Section title="仓库重量按原材料" description="关联原材料采购，按名称分别显示包数和总重量">
         {Object.keys(materialByName).length ? (
           <div className="prod-overview-grid">
-            {Object.entries(materialByName).map(([name, kg]) => (
+            {Object.entries(materialByName).map(([name, stats]) => (
               <div key={name} className="prod-overview-card">
                 <div className="pov-icon" style={{ background: "#f39c1220", color: "#f39c12" }}>📊</div>
                 <span>{name}</span>
-                <strong>{kg}公斤</strong>
-                <small>原材料</small>
+                <strong>{stats.bao}包</strong>
+                <small>{stats.kg.toFixed(1)}公斤</small>
               </div>
             ))}
           </div>
