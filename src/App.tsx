@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AppLayout } from "./components/Layout";
 import { ErrorState, Skeleton } from "./components/ui";
+import { PWAUpdateBanner } from "./components/PWAUpdateBanner";
 import { ProductionRecordPage, DingxingPage } from "./pages/ProductionRecordPage";
 import { ExpenseRecordPage, ExpenseStatsPage, PaymentIncomePage } from "./pages/ExpensePages";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
@@ -66,5 +67,10 @@ const router = createBrowserRouter([
 ]);
 
 export function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} />
+      <PWAUpdateBanner />
+    </>
+  );
 }
