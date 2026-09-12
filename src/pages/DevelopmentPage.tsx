@@ -18,7 +18,7 @@ const projectFields: FieldDefinition[] = [
 export function DevelopmentPage() {
   const { data, run } = useWorkspace();
   const [params, setParams] = useSearchParams();
-  const [dialog, setDialog] = useState<{ type: string; item?: Record<string, any> } | null>(null);
+  const [dialog, setDialog] = useState<{ type: string; item?: Record<string, any>; projectId?: string } | null>(null);
   useEffect(() => { const value = params.get("new"); if (value) setDialog({ type: "project" }); }, [params]);
   const close = () => { setDialog(null); setParams({}); };
   return (
