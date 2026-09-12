@@ -10,3 +10,14 @@ logs/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+
+.vercel
+
+# Android / Capacitor
+android/local.properties
+android/.gradle/
+android/app/build/
+android/build/
+android/captures/
+android/.idea/
+*.iml
