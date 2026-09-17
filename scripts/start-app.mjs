@@ -19,6 +19,7 @@ const webFile = path.join(projectRoot, "dist", "index.html");
 fs.mkdirSync(logsDir, { recursive: true });
 
 if (canReuse(await healthStatus())) {
+  startWatchdog();
   maybeOpenBrowser();
   console.log(`袜厂进销存ERP管理系统已经在运行：${baseUrl}`);
   process.exit(0);
@@ -26,6 +27,7 @@ if (canReuse(await healthStatus())) {
 
 const launchLock = await acquireLaunchLock();
 if (launchLock === null) {
+  startWatchdog();
   maybeOpenBrowser();
   console.log(`袜厂进销存ERP管理系统已经在运行：${baseUrl}`);
   process.exit(0);
@@ -39,6 +41,7 @@ process.once("exit", releaseLaunchLock);
 // 获取启动锁后再检查一次，避免两次双击在健康检查与加锁之间同时启动服务。
 const existingStatus = await healthStatus();
 if (canReuse(existingStatus)) {
+  startWatchdog();
   maybeOpenBrowser();
   console.log(`袜厂进销存ERP管理系统已经在运行：${baseUrl}`);
   process.exit(0);
@@ -85,6 +88,7 @@ fs.writeFileSync(pidFile, JSON.stringify({ pid: child.pid, projectRoot, buildId,
 for (let attempt = 0; attempt < 80; attempt += 1) {
   const status = await healthStatus();
   if (status?.application === "muzi-workspace" && status.buildId === buildId && status.instanceId === instanceId) {
+    startWatchdog();
     maybeOpenBrowser();
     console.log(`袜厂进销存ERP管理系统已启动：${baseUrl}`);
     console.log(`数据目录：${dataRoot}`);
@@ -106,6 +110,30 @@ async function healthStatus() {
     return data?.status === "ok" ? data : null;
   } catch {
     return null;
+  }
+}
+
+// 启动看门狗（后台常驻）。看门狗自带单实例锁，重复启动会自行退出。
+// 它负责在服务长时间空闲、休眠唤醒或偶发挂死时自动重启，无需人工干预。
+function startWatchdog() {
+  try {
+    const watchdogFile = path.join(projectRoot, "scripts", "watchdog.mjs");
+    if (!fs.existsSync(watchdogFile)) return;
+    const wd = spawn(process.execPath, [watchdogFile], {
+      cwd: projectRoot,
+      detached: true,
+      env: {
+        ...process.env,
+        NODE_ENV: "production",
+        MUZI_PORT: String(port),
+        MUZI_DATA_DIR: dataRoot,
+      },
+      stdio: "ignore",
+    });
+    wd.unref();
+    console.log("已启用后台保活看门狗，服务空闲挂起时会自动重启。");
+  } catch (error) {
+    console.warn(`看门狗启动失败（不影响本次使用）：${error.message}`);
   }
 }
 
