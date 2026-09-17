@@ -25,6 +25,98 @@ const SYNC_PREFIX = "sock-erp-";
 /** 同步防抖时间（毫秒） */
 const DEBOUNCE_MS = 1500;
 
+/**
+ * 各 key 的云端更新时间统一存放在这个独立的 meta 对象里。
+ * 之前把 _cloud_updated_at 直接展开进业务数据，会把数组（如原材料、翻袜等）
+ * 污染成 {0:..., 1:..., _cloud_updated_at:...} 的普通对象，导致页面 Array.isArray 判定失败。
+ */
+const SYNC_META_KEY = "sock-erp-sync-meta";
+
+type SyncMeta = Record<string, string>;
+
+/** 读取同步时间戳 meta（meta 本身是对象，不会被污染） */
+function getSyncMeta(): SyncMeta {
+  try {
+    const raw = originalLocalStorage.getItem(SYNC_META_KEY);
+    return raw ? (JSON.parse(raw) as SyncMeta) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** 写入同步时间戳 meta（不经过云同步，避免循环） */
+function setSyncMeta(meta: SyncMeta): void {
+  try {
+    originalLocalStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
+  } catch {
+    /* 存储空间不足等情况忽略 */
+  }
+}
+
+/**
+ * 修复历史上被错误展开污染的数组。
+ * 被污染的数组形如 {"0":{...},"1":{...},"_cloud_updated_at":"..."}，
+ * 当数字键连续为 0..n-1 时还原为真正的数组。
+ */
+export function repairPollutedArray(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj);
+  const numericKeys = keys.filter((k) => /^\d+$/.test(k)).map(Number);
+  if (numericKeys.length === 0) return value;
+
+  // 必须是从 0 开始的连续整数键，才认定是被污染的数组
+  const maxKey = Math.max(...numericKeys);
+  let continuous = true;
+  for (let i = 0; i <= maxKey; i++) {
+    if (!Object.prototype.hasOwnProperty.call(obj, String(i))) {
+      continuous = false;
+      break;
+    }
+  }
+  if (!continuous) return value;
+
+  // 数组元素占绝大多数（允许混入时间戳字段），才还原
+  const nonNumericKeys = keys.filter((k) => !/^\d+$/.test(k));
+  const allowedMetaKeys = new Set(["_cloud_updated_at"]);
+  const onlyMeta = nonNumericKeys.every((k) => allowedMetaKeys.has(k));
+  if (!onlyMeta) return value;
+
+  const arr: unknown[] = [];
+  for (let i = 0; i <= maxKey; i++) {
+    arr.push(obj[String(i)]);
+  }
+  return arr;
+}
+
+/** 启动时扫描并修复本地所有被污染的业务数据 */
+function repairAllLocal(): number {
+  let repaired = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !shouldSync(key)) continue;
+      const raw = originalLocalStorage.getItem(key);
+      if (!raw) continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+      const fixed = repairPollutedArray(parsed);
+      if (fixed !== parsed) {
+        originalLocalStorage.setItem(key, JSON.stringify(fixed));
+        repaired++;
+      }
+    }
+  } catch {
+    /* 忽略 */
+  }
+  return repaired;
+}
+
 /** 生成设备ID */
 function getDeviceId(): string {
   let id = originalLocalStorage.getItem("sock-erp-device-id");
@@ -62,7 +154,11 @@ function setStatus(status: SyncStatus, detail?: string) {
 
 /** 判断是否是需要同步的key */
 function shouldSync(key: string): boolean {
-  return key.startsWith(SYNC_PREFIX) && key !== "sock-erp-device-id";
+  return (
+    key.startsWith(SYNC_PREFIX) &&
+    key !== "sock-erp-device-id" &&
+    key !== SYNC_META_KEY
+  );
 }
 
 /** 防抖写入云端 */
@@ -106,6 +202,7 @@ async function upsertToCloud(key: string, value: string) {
       parsed = value;
     }
 
+    const updatedAt = new Date().toISOString();
     const { error } = await supabase
       .from("app_data")
       .upsert(
@@ -113,12 +210,16 @@ async function upsertToCloud(key: string, value: string) {
           storage_key: key,
           data: parsed,
           device_id: deviceId,
-          updated_at: new Date().toISOString(),
+          updated_at: updatedAt,
         },
         { onConflict: "storage_key" },
       );
 
     if (error) throw error;
+    // 时间戳单独存到 meta，不污染业务数据（尤其数组）
+    const meta = getSyncMeta();
+    meta[key] = updatedAt;
+    setSyncMeta(meta);
     setStatus("idle");
   } catch (error) {
     console.error("[CloudSync] 写入失败:", error);
@@ -157,36 +258,35 @@ async function pullFromCloud(): Promise<number> {
 
     let merged = 0;
     const records = (data as CloudRecord[]) || [];
+    const meta = getSyncMeta();
 
     for (const record of records) {
+      // 跳过内部 meta key（兼容旧数据）
+      if (record.storage_key === SYNC_META_KEY) continue;
+
+      // 云端数据先修复历史污染（数组被展开成对象的情况）
+      const cloudData = repairPollutedArray(record.data);
+      const cloudValue = JSON.stringify(cloudData);
       const localValue = originalLocalStorage.getItem(record.storage_key);
-      const cloudValue = JSON.stringify(record.data);
 
       if (localValue === null) {
-        // 本地没有，直接用云端
+        // 本地没有，直接用云端（原样写入，不展开时间戳）
         originalLocalStorage.setItem(record.storage_key, cloudValue);
+        meta[record.storage_key] = record.updated_at;
         merged++;
       } else if (record.device_id !== deviceId) {
-        // 来自其他设备，比较更新时间
-        try {
-          const localData = JSON.parse(localValue);
-          const localTime = localData?._cloud_updated_at;
-          if (!localTime || new Date(record.updated_at) > new Date(localTime)) {
-            // 云端更新，合并
-            const mergedData =
-              typeof record.data === "object" && record.data !== null
-                ? { ...record.data, _cloud_updated_at: record.updated_at }
-                : record.data;
-            originalLocalStorage.setItem(record.storage_key, JSON.stringify(mergedData));
-            merged++;
-          }
-        } catch {
+        // 来自其他设备，用独立 meta 中的时间戳比较，不再读取业务数据内的字段
+        const localTime = meta[record.storage_key];
+        if (!localTime || new Date(record.updated_at) > new Date(localTime)) {
+          // 云端更新，原样写入（数组保持数组、对象保持对象）
           originalLocalStorage.setItem(record.storage_key, cloudValue);
+          meta[record.storage_key] = record.updated_at;
           merged++;
         }
       }
     }
 
+    setSyncMeta(meta);
     setStatus("idle");
     return merged;
   } catch (error) {
@@ -215,10 +315,17 @@ function subscribeRealtime() {
 
         if (payload.eventType === "DELETE" && oldRecord) {
           originalLocalStorage.removeItem(oldRecord.storage_key);
+          const meta = getSyncMeta();
+          delete meta[oldRecord.storage_key];
+          setSyncMeta(meta);
           window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key, type: "delete" } }));
         } else if (record) {
-          const value = JSON.stringify(record.data);
-          originalLocalStorage.setItem(key, value);
+          // 实时推送同样修复污染，并原样写入，不展开时间戳
+          const fixed = repairPollutedArray(record.data);
+          originalLocalStorage.setItem(key, JSON.stringify(fixed));
+          const meta = getSyncMeta();
+          meta[key] = record.updated_at;
+          setSyncMeta(meta);
           window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key, type: "update" } }));
         }
       },
@@ -250,12 +357,20 @@ export const cloudStorage = {
     if (initialized) return { merged: 0 };
     initialized = true;
 
+    // 先修复本地历史上被污染的数组数据
+    const repaired = repairAllLocal();
+    if (repaired > 0) {
+      console.warn(`[CloudSync] 已修复 ${repaired} 个被污染的本地数据`);
+    }
+
     if (!SUPABASE_CONFIG.enabled) {
       setStatus("idle");
       return { merged: 0 };
     }
 
     const merged = await pullFromCloud();
+    // 云端拉取后再修复一次，确保新数据正常
+    repairAllLocal();
     subscribeRealtime();
 
     // 监听网络状态
