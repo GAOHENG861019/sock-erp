@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App";
 import { WorkspaceProvider } from "./WorkspaceContext";
 import { cloudStorage } from "./sync";
+import { notifyAppReady } from "./app-update";
 import "./styles.css";
 import "./themes/notebook.css";
 import "./neo.css";
@@ -33,6 +34,9 @@ void cloudStorage.init().then(({ merged }) => {
     console.log(`[CloudSync] 从云端合并了 ${merged} 条数据`);
   }
 });
+
+// 通知热更新插件当前 bundle 已正常启动（否则会被判定失败并回滚）
+void notifyAppReady();
 
 const queryClient = new QueryClient({
   defaultOptions: {

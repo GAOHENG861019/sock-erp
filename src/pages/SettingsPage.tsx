@@ -7,6 +7,7 @@ import type { CollectionName } from "../types";
 import { formatBytes, formatDateTime } from "../utils";
 import { Badge, Button, ConfirmDialog, EmptyState, ErrorState, PageHeader, Section, Skeleton } from "../components/ui";
 import { ModuleArtwork } from "../components/ModuleArtwork";
+import { AppUpdateSection } from "../components/AppUpdateSection";
 import { normalizeAppearance } from "../appearance";
 
 const collectionLabels: Record<string, string> = { planItems: "本月总览", quickMemos: "快速备忘", mediaContents: "工作进度", devProjects: "商品项目", devMilestones: "商品分类", devWorkItems: "商品明细", devLogs: "操作日志", clients: "客户", consultingProjects: "仓库项目", consultingInteractions: "出入库记录", consultingDeliverables: "出库单", consultingFollowups: "库存跟进", consultingTimeEntries: "盘点时长", workoutTemplates: "采购模板", workoutTemplateExercises: "模板物料", workouts: "采购记录", workoutExercises: "采购明细", workoutSets: "采购批次", bodyMetrics: "供应商数据", nutritionTargets: "库存目标", foods: "常用物料", meals: "盘点单", mealItems: "盘点明细", entertainmentItems: "采购单", playSessions: "采购执行记录" };
@@ -95,6 +96,8 @@ export function SettingsPage() {
         </Section>
         <Section title="导出" description="生成包含 JSON 和各模块 CSV 的压缩包"><div className="export-panel"><DownloadSimple size={28} /><div><strong>完整数据导出</strong><p>适合人工查看和未来迁移，不替代完整备份。</p></div><Button variant="secondary" loading={busy === "export"} onClick={() => void exportAll()}>导出 ZIP</Button></div></Section>
       </div>
+
+      <AppUpdateSection />
 
       <Section title="百度网盘备份" description="将备份自动同步到百度网盘同步目录，无需额外服务器" action={
         <div style={{ display: "flex", gap: 8 }}>
