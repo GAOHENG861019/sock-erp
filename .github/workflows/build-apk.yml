@@ -24,8 +24,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: 配置 Android SDK
-        uses: android-actions/setup-android@v3
+      - name: 安装 Android 36 平台（使用 runner 预装 SDK）
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: 安装依赖
         run: npm ci
@@ -35,9 +37,6 @@ jobs:
 
       - name: 同步 Capacitor 到 Android
         run: npx cap sync android
-
-      - name: 安装 Android 36 平台
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: 构建 Debug APK
         working-directory: android
