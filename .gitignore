@@ -13,6 +13,11 @@ logs/
 
 .vercel
 
+# 环境变量与密钥（service role key 等，禁止提交）
+.env
+.env.*
+!.env.example
+
 # Android / Capacitor
 android/local.properties
 android/.gradle/
