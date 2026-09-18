@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { X, WarningCircle, SpinnerGap } from "@phosphor-icons/react";
 import { classNames } from "../utils";
@@ -99,7 +100,9 @@ export function Modal({ title, description, open, onClose, children, wide = fals
     };
   }, [open]);
   if (!open) return null;
-  return (
+  // 通过 Portal 渲染到 body，避免被带 transform/filter 的祖先容器限制 fixed 定位，
+  // 导致内容较高的弹窗顶部溢出视口、无法查看与填写。
+  const backdrop = (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section ref={modalRef} className={classNames("modal", "glass-regular", wide && "modal-wide")} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}>
         <header className="modal-header">
@@ -110,6 +113,11 @@ export function Modal({ title, description, open, onClose, children, wide = fals
       </section>
     </div>
   );
+  // neo 主题样式以 .neo-shell 为祖先选择器，Portal 脱离 app-shell 后需补一层同名容器，避免主题丢失。
+  if (document.documentElement.dataset.appearance === "neo") {
+    return createPortal(<div className="neo-shell">{backdrop}</div>, document.body);
+  }
+  return createPortal(backdrop, document.body);
 }
 
 export type FieldDefinition = {

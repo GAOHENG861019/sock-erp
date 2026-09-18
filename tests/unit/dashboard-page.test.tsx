@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 // 可变的 mock 状态，便于在用例中切换 settings
 const h = vi.hoisted(() => ({
   settings: {} as Record<string, any>,
-  saveSettings: vi.fn(() => Promise.resolve({})),
+  saveSettings: vi.fn((_payload?: unknown) => Promise.resolve({})),
 }));
 
 // Mock dependencies - paths relative to this test file (tests/unit/)
