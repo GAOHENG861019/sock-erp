@@ -56,7 +56,7 @@ describe("application shell", () => {
     renderApp();
     const sidebar = await screen.findByLabelText("主导航");
     expect(sidebar).toBeInTheDocument();
-    for (const label of ["首页总览", "本月总览", "翻袜", "缝头", "定型", "商品管理", "仓库管理", "客户中心", "分类中心", "库存盘点", "原材料采购", "机器损耗", "运货运费", "工资支出", "支出统计", "货款收入", "采购审核", "出库审核", "销货审核", "数据与设置"]) {
+    for (const label of ["首页总览", "本月总览", "翻袜", "缝头", "定型", "商品管理", "仓库管理", "客户中心", "分类中心", "库存盘点", "原材料采购", "机器损耗", "运货运费", "工资支出", "支收统计", "货款收入", "采购审核", "出库审核", "销货审核", "数据与设置"]) {
       expect(sidebar.textContent).toContain(label);
     }
     expect(screen.getByRole("button", { name: /搜索所有内容/ })).toBeInTheDocument();
