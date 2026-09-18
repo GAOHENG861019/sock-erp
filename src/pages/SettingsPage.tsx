@@ -13,7 +13,7 @@ import { isNativeApp } from "../plugins/AppUpdate";
 import * as XLSX from "xlsx";
 
 const collectionLabels: Record<string, string> = { planItems: "本月总览", quickMemos: "快速备忘", mediaContents: "工作进度", devProjects: "商品项目", devMilestones: "商品分类", devWorkItems: "商品明细", devLogs: "操作日志", clients: "客户", consultingProjects: "仓库项目", consultingInteractions: "出入库记录", consultingDeliverables: "出库单", consultingFollowups: "库存跟进", consultingTimeEntries: "盘点时长", workoutTemplates: "采购模板", workoutTemplateExercises: "模板物料", workouts: "采购记录", workoutExercises: "采购明细", workoutSets: "采购批次", bodyMetrics: "供应商数据", nutritionTargets: "库存目标", foods: "常用物料", meals: "盘点单", mealItems: "盘点明细", entertainmentItems: "采购单", playSessions: "采购执行记录" };
-const dashboardOptions = [{ value: "media", label: "工作进度" }, { value: "development", label: "商品管理" }, { value: "consulting", label: "仓库管理" }, { value: "fitness", label: "原材料采购" }, { value: "diet", label: "库存盘点" }, { value: "entertainment", label: "采购单" }];
+const dashboardOptions = [{ value: "development", label: "商品管理" }, { value: "consulting", label: "仓库管理" }, { value: "customer", label: "客户中心" }, { value: "fitness", label: "原材料采购" }, { value: "diet", label: "库存盘点" }, { value: "entertainment", label: "机器损耗" }];
 
 export function SettingsPage() {
   const { data, run } = useWorkspace();

@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+
+// 可变的 mock 状态，便于在用例中切换 settings
+const h = vi.hoisted(() => ({
+  settings: {} as Record<string, any>,
+  saveSettings: vi.fn(() => Promise.resolve({})),
+}));
 
 // Mock dependencies - paths relative to this test file (tests/unit/)
 vi.mock("@tanstack/react-query", () => ({
@@ -25,6 +31,7 @@ vi.mock("../../src/api", () => ({
     create: vi.fn(),
     completePlan: vi.fn(),
     convertMemo: vi.fn(),
+    saveSettings: h.saveSettings,
   },
 }));
 
@@ -34,10 +41,10 @@ vi.mock("../../src/WorkspaceContext", () => ({
       quickMemos: [],
       consultingProjects: [],
       consultingInteractions: [],
-      settings: { dashboardModules: [] },
+      settings: h.settings,
     },
     registerSaveHandler: vi.fn(),
-    run: vi.fn(),
+    run: (operation: () => Promise<unknown>) => operation(),
   }),
 }));
 
@@ -45,6 +52,8 @@ import { DashboardPage } from "../../src/pages/DashboardPage";
 
 beforeEach(() => {
   window.localStorage.clear();
+  h.settings = {};
+  h.saveSettings.mockClear();
 });
 
 function renderDashboard() {
@@ -128,5 +137,73 @@ describe("首页总览", () => {
     expect(text).toContain("黑色");
     expect(text).toContain("20包");
     expect(text).toContain("40公斤");
+  });
+});
+
+describe("各模块摘要自定义", () => {
+  const moduleLabels = ["商品管理", "仓库管理", "客户中心", "原材料采购", "库存盘点", "机器损耗"];
+
+  it("各模块摘要区域提供自定义入口", () => {
+    renderDashboard();
+    expect(screen.getByText("各模块摘要")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /自定义/ })).toBeInTheDocument();
+  });
+
+  it("未配置时默认显示全部6个模块", () => {
+    renderDashboard();
+    const text = document.body.textContent || "";
+    moduleLabels.forEach((label) => expect(text).toContain(label));
+  });
+
+  it("点击自定义弹出包含全部模块且默认勾选的弹窗", () => {
+    renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: /自定义/ }));
+    expect(screen.getByText("自定义模块摘要")).toBeInTheDocument();
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes).toHaveLength(6);
+    expect(boxes.every((box) => (box as HTMLInputElement).checked)).toBe(true);
+    // 弹窗打开后，每个模块标题同时出现在摘要卡片和弹窗勾选项中（各一次）
+    moduleLabels.forEach((label) => expect(screen.getAllByText(label).length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("取消勾选某模块并完成后，保存不含该模块的 dashboardModules", () => {
+    renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: /自定义/ }));
+    const boxes = screen.getAllByRole("checkbox");
+    // 顺序：商品管理 / 仓库管理 / 客户中心 / 原材料采购 / 库存盘点 / 机器损耗
+    fireEvent.click(boxes[2]); // 取消勾选“客户中心”
+    fireEvent.click(screen.getByRole("button", { name: "完成" }));
+    expect(h.saveSettings).toHaveBeenCalledTimes(1);
+    const payload = h.saveSettings.mock.calls[0][0] as { dashboardModules: string[] };
+    expect(Array.isArray(payload.dashboardModules)).toBe(true);
+    expect(payload.dashboardModules).not.toContain("customer");
+    expect(payload.dashboardModules).toContain("development");
+    expect(payload.dashboardModules).toHaveLength(5);
+  });
+
+  it("全选按钮恢复全部模块并保存", () => {
+    h.settings = { dashboardModules: ["development"] };
+    renderDashboard();
+    fireEvent.click(screen.getByRole("button", { name: /自定义/ }));
+    fireEvent.click(screen.getByRole("button", { name: "全选" }));
+    fireEvent.click(screen.getByRole("button", { name: "完成" }));
+    const payload = h.saveSettings.mock.calls[0][0] as { dashboardModules: string[] };
+    expect(payload.dashboardModules).toHaveLength(6);
+  });
+
+  it("按 settings.dashboardModules 只显示被选中的模块", () => {
+    h.settings = { dashboardModules: ["development", "fitness"] };
+    renderDashboard();
+    const text = document.body.textContent || "";
+    expect(text).toContain("商品管理");
+    expect(text).toContain("原材料采购");
+    expect(text).not.toContain("客户中心");
+    expect(text).not.toContain("机器损耗");
+  });
+
+  it("dashboardModules 为空数组时显示全部隐藏提示", () => {
+    h.settings = { dashboardModules: [] };
+    renderDashboard();
+    expect(screen.getByText(/已隐藏全部模块/)).toBeInTheDocument();
   });
 });
