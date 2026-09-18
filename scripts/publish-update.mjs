@@ -32,6 +32,8 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 const args = process.argv.slice(2);
 const notes = (() => {
+  // 优先用环境变量传中文更新说明，避免 Windows PowerShell 命令行参数编码导致乱码
+  if (process.env.PUBLISH_NOTES) return process.env.PUBLISH_NOTES;
   const i = args.indexOf("--notes");
   return i >= 0 ? args[i + 1] : "";
 })();
