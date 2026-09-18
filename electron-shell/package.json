@@ -1,0 +1,8 @@
+{
+  "name": "sock-erp-desktop",
+  "version": "1.3.1",
+  "private": true,
+  "description": "袜厂进销存ERP管理系统 电脑版",
+  "author": "GAOHENG",
+  "main": "main.cjs"
+}

@@ -35,3 +35,13 @@ push_to_github.py
 # 临时/构建产物
 dist_new/
 blob_progress.json
+
+# 便携 Node 运行时（电脑版自带，不入库）
+runtime/
+
+# Electron 电脑版打包产物（安装包/中间 staging，体积大，不入库）
+release/
+release-staging/
+electron-shell/node_modules/
+electron-shell/dist/
+electron-shell/release/

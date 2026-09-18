@@ -1,0 +1,38 @@
+appId: com.sock.erp.desktop
+productName: 袜厂进销存ERP
+copyright: Copyright © 2026
+directories:
+  output: ../release
+  buildResources: ../build
+files:
+  - main.cjs
+  - icon.ico
+  - package.json
+  - "!**/node_modules/**"
+# 后端运行时（便携 Node + 前端 dist + 后端 dist-server + 生产依赖 + 迁移文件）
+extraResources:
+  - from: ../release-staging/app-server
+    to: app-server
+    filter:
+      - "**/*"
+win:
+  target:
+    - nsis
+  icon: icon.ico
+  requestedExecutionLevel: asInvoker
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 袜厂进销存ERP
+  installerIcon: icon.ico
+  uninstallerIcon: icon.ico
+artifactName: SockERP-Desktop-Setup-${version}.exe
+compression: maximum
+asar: true
+npmRebuild: false
+electronVersion: 31.7.7
+afterPack: electron-shell/after-pack.cjs

@@ -16,6 +16,7 @@ import {
   restartWithBundle,
   type UpdateCheckResult,
 } from "../app-update";
+import { APP_VERSION } from "../version";
 
 type Phase = "idle" | "checking" | "downloading" | "ready" | "error";
 
@@ -98,11 +99,11 @@ export function AppUpdateSection() {
           {native ? (
             <div>
               <strong>当前版本 {currentVersion || "未知"}</strong>
-              <small>原生版本 {nativeVersion || "未知"}</small>
+              <small>原生版本 {nativeVersion || "未知"} · 前端 v{APP_VERSION}</small>
             </div>
           ) : (
             <div>
-              <strong>网页 / 电脑端</strong>
+              <strong>网页 / 电脑端 · 前端 v{APP_VERSION}</strong>
               <small>浏览器和电脑版刷新即为最新，无需应用内更新</small>
             </div>
           )}
