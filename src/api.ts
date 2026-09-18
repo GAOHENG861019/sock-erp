@@ -1,4 +1,5 @@
 import type { CollectionName, WorkspaceState, DashboardData, BackupRecord, Entity } from "./types";
+import { saveUiPreferences } from "./ui-preferences";
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -49,7 +50,18 @@ export const api = {
   convertMemo: (id: string, collection: CollectionName, fields: Record<string, any>) =>
     request<Entity>(`/api/quick-memos/${id}/convert`, { method: "POST", body: JSON.stringify({ collection, fields }) }),
   settings: () => request<Record<string, any>>("/api/settings"),
-  saveSettings: (input: Record<string, any>) => request<Record<string, any>>("/api/settings", { method: "PUT", body: JSON.stringify(input) }),
+  saveSettings: async (input: Record<string, any>) => {
+    let result: Record<string, any> | undefined;
+    try {
+      result = await request<Record<string, any>>("/api/settings", { method: "PUT", body: JSON.stringify(input) });
+    } catch (error) {
+      // 仅在网络层失败（无后端/离线，如 Capacitor 手机端）时降级到本地；HTTP 业务错误仍向上抛出
+      if (!(error instanceof TypeError)) throw error;
+    }
+    // 界面风格/主题同时持久化到本地，保证手机 APP（无后端）也能切换并保留
+    saveUiPreferences(input);
+    return result ?? input;
+  },
   systemStatus: () => request<Record<string, any>>("/api/system/status"),
   saveNow: () => request<{ savedAt: string; database: string; dataFile: string }>("/api/system/save", { method: "POST" }),
   saveAndExit: () => request<{ savedAt: string; database: string; dataFile: string; exiting: boolean }>("/api/system/save-and-exit", { method: "POST" }),

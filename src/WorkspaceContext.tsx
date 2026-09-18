@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
 import type { WorkspaceState } from "./types";
+import { readUiPreferences, UI_PREFS_CHANGED_EVENT } from "./ui-preferences";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type SaveHandler = () => Promise<void> | void;
@@ -31,6 +32,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const saveHandlers = useRef(new Set<SaveHandler>());
   const query = useQuery({ queryKey: ["workspace"], queryFn: api.state, staleTime: 15_000 });
+
+  // 界面风格/主题在无后端环境（手机 APP）下从 localStorage 兜底；后端有值时后端优先。
+  // 本地偏好保存后会派发事件，驱动这里重新计算（手机端 query.data 恒为 undefined）。
+  const [prefsTick, setPrefsTick] = useState(0);
+  useEffect(() => {
+    const handler = () => setPrefsTick((t) => t + 1);
+    window.addEventListener(UI_PREFS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(UI_PREFS_CHANGED_EVENT, handler);
+  }, []);
+  const data: WorkspaceState = useMemo(() => {
+    const base = query.data ?? emptyState;
+    return { ...base, settings: { ...readUiPreferences(), ...base.settings } };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query.data, prefsTick]);
 
   useEffect(() => {
     if (saveStatus !== "saved") return;
@@ -79,7 +94,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [refreshSavedData]);
 
   const value = useMemo<WorkspaceContextValue>(() => ({
-    data: query.data ?? emptyState,
+    data,
     loading: query.isLoading,
     error: query.error instanceof Error ? query.error.message : null,
     saveStatus,
@@ -89,7 +104,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     refresh: async () => {
       await queryClient.invalidateQueries();
     },
-  }), [query.data, query.isLoading, query.error, queryClient, registerSaveHandler, run, saveNow, saveStatus]);
+  }), [data, query.isLoading, query.error, queryClient, registerSaveHandler, run, saveNow, saveStatus]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
