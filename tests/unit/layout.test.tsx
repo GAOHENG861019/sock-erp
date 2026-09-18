@@ -25,14 +25,15 @@ describe("布局导航", () => {
 
   it("库存盘点在商品与仓库分组下", () => {
     renderLayout();
-    const nav = screen.getByRole("navigation");
+    const navs = screen.getAllByRole("navigation");
+    const nav = navs.find((n) => (n.textContent || "").includes("商品与仓库")) || navs[0];
     const text = nav.textContent || "";
     // 商品与仓库分组包含库存盘点
     const warehouseIdx = text.indexOf("商品与仓库");
-    const expenseIdx = text.indexOf("支出管理");
+    const customerIdx = text.indexOf("客户中心");
     const inventoryIdx = text.indexOf("库存盘点");
     expect(inventoryIdx).toBeGreaterThan(warehouseIdx);
-    expect(inventoryIdx).toBeLessThan(expenseIdx);
+    expect(inventoryIdx).toBeLessThan(customerIdx);
   });
 
   it("快速新建弹窗显示自定义按钮", () => {

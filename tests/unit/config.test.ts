@@ -9,8 +9,8 @@ let directory = "";
 afterEach(() => { if (directory) removeTestDirectory(directory); directory = ""; });
 
 describe("local application configuration", () => {
-  it("binds only to the loopback address", () => {
-    expect(APP_HOST).toBe("127.0.0.1");
+  it("binds to 0.0.0.0 for LAN access", () => {
+    expect(APP_HOST).toBe("0.0.0.0");
   });
 
   it("creates separate data, backup, export and log directories", () => {

@@ -1721,6 +1721,11 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 .export-panel > svg { color: var(--accent); }
 .export-panel strong { font-size: 12.5px; font-weight: 620; }
 .export-panel p { margin: 5px 0 0; color: var(--text-soft); font-size: 10.5px; line-height: 1.55; }
+.export-modules-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.export-module-item { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-chip); cursor: pointer; font-size: 11px; color: var(--text-soft); transition: all var(--motion-control) ease; background: var(--surface); }
+.export-module-item:hover { border-color: var(--accent); color: var(--text); }
+.export-module-item.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.export-module-item input { margin: 0; accent-color: var(--accent); }
 .preferences > div, .preferences > label { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--border); }
 .preferences > div > div:first-child, .preferences > label > div { display: grid; gap: 3px; }
 .preferences strong { font-size: 11.5px; font-weight: 600; }
@@ -2051,6 +2056,7 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
   border-bottom: 1px solid var(--border, rgba(0,0,0,0.06));
 }
 .prod-table tr:hover { background: var(--hover, rgba(0,0,0,0.02)); }
+.prod-table tr.long-press-active { background: rgba(244, 67, 54, 0.15); transition: background 0.2s; }
 .prod-summary {
   display: flex;
   gap: 32px;
@@ -2135,33 +2141,33 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
   gap: 14px;
 }
 .prod-overview-card {
-  padding: 18px;
-  border-radius: 12px;
+  padding: 12px;
+  border-radius: 10px;
   background: var(--surface, #f8f9fa);
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .prod-overview-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 .pov-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: var(--accent-bg, rgba(0,120,255,0.1));
   color: var(--accent, #0078ff);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
-.prod-overview-card span { font-size: 13px; color: var(--text-secondary, #666); }
-.prod-overview-card strong { font-size: 28px; font-weight: 700; }
-.prod-overview-card small { font-size: 12px; color: #999; }
+.prod-overview-card span { font-size: 12px; color: var(--text-secondary, #666); }
+.prod-overview-card strong { font-size: 20px; font-weight: 700; }
+.prod-overview-card small { font-size: 11px; color: #999; }
 .prod-overview-card .pov-breakdown { font-size: 11px; color: #aaa; display: block; margin-top: 2px; line-height: 1.4; word-break: break-all; }
 
 /* === 商品管理卡片 === */
@@ -2264,9 +2270,9 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 .month-overview-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 12px;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
   background: var(--surface, #f8f9fa);
   border: 1px solid var(--border);
 }
@@ -2274,20 +2280,20 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  font-size: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 16px;
   flex-shrink: 0;
 }
 .month-overview-card small {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 .month-overview-card strong {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
 }
 @media (max-width: 900px) {
@@ -2304,15 +2310,15 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
   gap: 16px;
 }
 .expense-stat-card {
-  padding: 20px;
-  border-radius: 12px;
+  padding: 12px;
+  border-radius: 10px;
   background: var(--surface, #f8f9fa);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
-.expense-stat-card span { font-size: 14px; color: var(--text-secondary, #666); }
-.expense-stat-card strong { font-size: 26px; font-weight: 700; }
+.expense-stat-card span { font-size: 12px; color: var(--text-secondary, #666); }
+.expense-stat-card strong { font-size: 20px; font-weight: 700; }
 .expense-bar {
   height: 8px;
   background: #e0e0e0;
@@ -2579,22 +2585,129 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
     grid-template-columns: repeat(2, 1fr);
   }
 
+  /* 弹窗全宽 */
+  .modal-backdrop { padding: 80px 12px 12px; }
+  .modal { width: 100% !important; max-width: 100% !important; margin: 0; max-height: 85vh; }
+  .modal-content { padding: 16px; }
+
+  /* 录入表单：输入框自适应 */
+  .production-input-row .prod-input { flex: 1 1 45%; min-width: 0; }
+  .production-input-row .prod-input[type="date"] { flex: 1 1 40%; }
+  .production-input-row button { flex: 1 1 100%; }
+
+  /* 页面头部操作按钮换行 */
+  .page-header-actions, .page-header .actions { flex-wrap: wrap; gap: 6px; }
+  .page-header-actions button, .page-header .actions button { flex: 1 1 auto; min-width: 0; }
+
+  /* 概览条自适应 */
+  .overview-strip { flex-wrap: wrap; gap: 8px; }
+  .overview-strip > div { flex: 1 1 40%; min-width: 0; }
+
+  /* 表格容器横向滚动 */
+  .prod-table-wrap, .section table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .prod-table { min-width: 320px; font-size: 13px; }
+  .prod-table th, .prod-table td { padding: 8px 6px; white-space: nowrap; }
+
+  /* 防止内容溢出 */
+  .section, .page-header, .prod-summary, .expense-stats-grid, .settings-grid { max-width: 100%; overflow-x: hidden; }
+  .expense-stats-grid { grid-template-columns: 1fr 1fr !important; }
+  .expense-stat-card { min-width: 0; }
+  .expense-stat-card strong { font-size: 18px; word-break: break-all; }
+
+  /* 设置页面手机端自适应 */
+  .settings-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+  .export-modules-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)) !important; gap: 6px !important; }
+  .export-module-item { padding: 6px 8px; font-size: 10.5px; }
+  .export-panel { grid-template-columns: 36px 1fr auto !important; gap: 10px !important; min-height: auto !important; padding: 12px 0 !important; }
+  .backup-list article { grid-template-columns: 60px minmax(0, 1fr) 70px auto !important; gap: 8px !important; padding: 8px 4px !important; }
+  .backup-copy input { font-size: 10px !important; padding: 4px 6px !important; }
+  .keep-check { font-size: 9.5px !important; gap: 3px !important; }
+
+  /* 触摸目标最小44px */
+  button, .icon-button, .icon-btn { min-height: 40px; }
+  .bottom-nav-item { min-height: 56px; }
+
   /* 隐藏桌面端元素 */
   .desktop-only { display: none !important; }
+
+  /* 输入表单防止溢出 */
+  .production-input-row { gap: 8px; }
+  .production-input-row .prod-input { min-width: 0 !important; }
+  .production-input-row input[type="date"] { min-width: 0 !important; }
 }
 
 @media (max-width: 480px) {
-  .prod-overview-grid { grid-template-columns: 1fr; }
+  .prod-overview-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .prod-overview-card { padding: 10px; gap: 8px; flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .prod-overview-card .pov-icon { width: 26px; height: 26px; flex-shrink: 0; }
+  .prod-overview-card .pov-icon svg { width: 16px; height: 16px; }
+  .prod-overview-card span { font-size: 11px; flex: 1; }
+  .prod-overview-card strong { font-size: 17px; }
+  .prod-overview-card small { font-size: 10px; }
+  .prod-overview-card .pov-breakdown { font-size: 10px; flex-basis: 100%; margin-top: 0; }
   .topbar-create { display: none; }
   .manual-save { display: none; }
-  /* 录入表单换行 */
-  .entry-form, .record-form, .fanwa-form, .fengtou-form, .dingxing-form {
-    flex-wrap: wrap;
-  }
-  .entry-form > *, .record-form > *, .fanwa-form > *, .fengtou-form > *, .dingxing-form > * {
-    flex: 1 1 45%;
-    min-width: 0;
-  }
+  /* 录入表单：每个输入框独占一行 */
+  .production-input-row .prod-input { flex: 1 1 100%; }
+  .production-input-row .prod-total-inline { flex: 1 1 100%; text-align: center; padding: 8px; background: var(--surface, #f5f5f5); border-radius: 8px; }
+  /* 摘要卡片单列 */
+  .summary-grid, .stats-row { grid-template-columns: 1fr; }
+  /* 概览条单列 */
+  .overview-strip > div { flex: 1 1 100%; }
+  /* 审核表单项单列 */
+  .audit-item-row { grid-template-columns: 1fr !important; }
+  .audit-stats { grid-template-columns: 1fr !important; }
+  /* 分类标签横向滚动 */
+  .category-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+  .category-tab { flex-shrink: 0; }
+  /* 工资卡片全宽 */
+  .salary-card { padding: 14px; }
+  .salary-card-row { flex-wrap: wrap; gap: 4px; }
+  /* 支出统计卡片单列 */
+  .expense-stats-grid { grid-template-columns: 1fr !important; }
+  /* 顶部栏进一步精简 */
+  .topbar { padding: 6px 10px; }
+  .toolbar-context strong { font-size: 13px; }
+  .cloud-sync-indicator { font-size: 10px; }
+  .cloud-sync-indicator svg { width: 12px; height: 12px; }
+  /* 页面标题更小 */
+  .page-header h1, .page-title { font-size: 18px; }
+  .section-title { font-size: 15px; }
+  /* 卡片内边距优化 */
+  .prod-overview-card { padding: 12px; }
+  .prod-overview-card strong { font-size: 20px; }
+  /* 弹窗内容内边距 */
+  .modal-content { padding: 14px; }
+  .modal { max-height: 85vh; }
+  /* 表格字体 */
+  .prod-table, .member-table, .data-table { font-size: 13px; }
+  .prod-table th, .prod-table td, .member-table th, .member-table td { padding: 8px 10px; }
+  /* 按钮触摸目标 */
+  .icon-button { width: 36px; height: 36px; }
+  .audit-btn { padding: 8px 12px; font-size: 14px; }
+  /* 分类项目 */
+  .category-item { padding: 12px 14px; }
+  .category-item-main { gap: 10px; }
+  /* 会员统计卡片 */
+  .member-stats > div { padding: 12px; }
+  /* 安全区域适配 */
+  .page-container { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .bottom-nav { padding-bottom: env(safe-area-inset-bottom); height: calc(60px + env(safe-area-inset-bottom)); }
+}
+
+/* 高分辨率手机优化 (3168×1440物理分辨率, DPR=3, CSS视口≈480×1056) */
+@media (max-width: 480px) and (min-resolution: 2dppx) {
+  /* 高DPI屏幕下字体微调 */
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  .bottom-nav-item { font-size: 12px; }
+  .bottom-nav-item svg, .bottom-nav-item .module-artwork { width: 24px; height: 24px; }
+  input, select, textarea { font-size: 16px; }
+}
+
+/* 平板尺寸优化 (768px-1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .prod-overview-grid { grid-template-columns: repeat(3, 1fr); }
+  .summary-grid, .stats-row { grid-template-columns: repeat(3, 1fr); }
 }
 .baidu-stats { font-size: 12px; color: var(--text-muted); }
 

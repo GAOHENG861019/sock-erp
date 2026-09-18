@@ -71,6 +71,8 @@ export function Modal({ title, description, open, onClose, children, wide = fals
   const modalRef = useRef<HTMLElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -80,7 +82,7 @@ export function Modal({ title, description, open, onClose, children, wide = fals
       first?.focus();
     });
     const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
       if (event.key !== "Tab" || !modalRef.current) return;
       const focusable = [...modalRef.current.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex='-1'])")];
       if (!focusable.length) return;
@@ -95,7 +97,7 @@ export function Modal({ title, description, open, onClose, children, wide = fals
       document.removeEventListener("keydown", handler);
       previousFocus?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>

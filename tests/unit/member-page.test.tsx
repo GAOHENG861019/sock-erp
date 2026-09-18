@@ -32,7 +32,7 @@ describe("会员管理页面", () => {
     fireEvent.change(within(modal).getByLabelText(/会员姓名/), { target: { value: "张三" } });
     fireEvent.change(within(modal).getByLabelText(/联系电话/), { target: { value: "13800138000" } });
 
-    fireEvent.click(within(modal).getByRole("button", { name: /添加会员/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
 
     expect(await screen.findByText("张三")).toBeInTheDocument();
     expect(screen.getByText("13800138000")).toBeInTheDocument();
@@ -45,7 +45,7 @@ describe("会员管理页面", () => {
     fireEvent.change(within(modal).getByLabelText(/会员姓名/), { target: { value: "李四" } });
     fireEvent.change(within(modal).getByLabelText(/积分/), { target: { value: "100" } });
     fireEvent.change(within(modal).getByLabelText(/储值余额/), { target: { value: "50" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加会员/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
 
     expect(await screen.findByText("李四")).toBeInTheDocument();
     // 统计卡片存在且数量正确
@@ -62,7 +62,7 @@ describe("会员管理页面", () => {
     fireEvent.click(screen.getByRole("button", { name: /添加会员/ }));
     let modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/会员姓名/), { target: { value: "王五" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加会员/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
     expect(await screen.findByText("王五")).toBeInTheDocument();
 
     // 编辑
@@ -80,8 +80,10 @@ describe("会员管理页面", () => {
     fireEvent.click(screen.getByRole("button", { name: /添加会员/ }));
     const modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/会员姓名/), { target: { value: "赵六" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加会员/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
     expect(await screen.findByText("赵六")).toBeInTheDocument();
+    // 关闭添加弹窗
+    fireEvent.click(within(modal).getByRole("button", { name: /取消/ }));
 
     fireEvent.click(screen.getByLabelText("删除"));
     const confirmDialog = screen.getByRole("dialog");

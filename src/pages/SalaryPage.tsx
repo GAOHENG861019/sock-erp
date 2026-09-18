@@ -47,7 +47,10 @@ const SALARY_KEY = "sock-erp-salary";
 function readJson<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as T;
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
+    return parsed;
   } catch {
     return fallback;
   }

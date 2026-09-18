@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Trash, Calculator, Plus, Pencil } from "@phosphor-icons/react";
 import { Button, EmptyState, Modal, PageHeader, Section } from "../components/ui";
 import { ModuleArtwork } from "../components/ModuleArtwork";
 
-type RawMaterial = { id: string; name: string; spec: string; weight: number; unitPrice: number; amount: number; packages?: number; photo?: string };
+type RawMaterial = { id: string; name: string; spec: string; weight: number; unitPrice: number; amount: number; packages?: number; photo?: string; payer?: string };
 
 function useRawMaterials() {
   const [items, setItems] = useState<RawMaterial[]>(() => {
-    try { const raw = localStorage.getItem("sock-erp-raw-materials"); return raw ? JSON.parse(raw) : []; } catch { return []; }
+    try { const raw = localStorage.getItem("sock-erp-raw-materials"); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : []; } catch { return []; }
   });
   useEffect(() => { try { localStorage.setItem("sock-erp-raw-materials", JSON.stringify(items)); } catch { /* ignore */ } }, [items]);
   return [items, setItems] as const;
@@ -30,17 +30,19 @@ export function FitnessPage() {
         <div><span>采购总额</span><strong>¥{rawTotal.toFixed(2)}</strong></div>
       </div>
       <Section title="原材料清单" description="添加名称、规格、包数、单重(公斤/包)和单价(元/公斤)，总重量和金额自动计算，可上传照片">
-        {rawMaterials.length ? <><table className="prod-table"><thead><tr><th>照片</th><th>名称</th><th>规格</th><th>包数</th><th>单重(公斤)</th><th>总重量(公斤)</th><th>单价(元/公斤)</th><th>金额</th><th>操作</th></tr></thead><tbody>{rawMaterials.map((item) => { const totalW = Number(item.packages || 0) * Number(item.weight || 0); return <tr key={item.id}><td>{item.photo ? <img src={item.photo} alt={item.name} style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6 }} /> : <span style={{ color: "#999", fontSize: 12 }}>无</span>}</td><td>{item.name}</td><td>{item.spec || "-"}</td><td>{item.packages || 0} 包</td><td>{item.weight} 公斤</td><td>{totalW.toFixed(2)} 公斤</td><td>¥{Number(item.unitPrice || 0).toFixed(2)}/公斤</td><td>¥{Number(item.amount).toFixed(2)}</td><td><button className="icon-button" title="编辑" onClick={() => setRawDialog(item)}><Pencil size={16} /></button><button className="icon-button danger-text" title="删除" onClick={() => setRawMaterials((prev) => prev.filter((r) => r.id !== item.id))}><Trash size={16} /></button></td></tr>; })}</tbody></table><div className="prod-summary prod-grand"><span><Calculator size={18} />原材料总额度：<strong>¥{rawTotal.toFixed(2)}</strong></span></div></> : <EmptyState title="还没有原材料" description="点击添加原材料，记录名称、规格、重量和单价。" action={<Button variant="secondary" onClick={() => setRawDialog({ id: "", name: "", spec: "", weight: 0, unitPrice: 0, amount: 0, packages: 0 })}>添加第一个原材料</Button>} />}
+        {rawMaterials.length ? <><table className="prod-table"><thead><tr><th>照片</th><th>名称</th><th>规格</th><th>采购人</th><th>包数</th><th>单重(公斤)</th><th>总重量(公斤)</th><th>单价(元/公斤)</th><th>金额</th><th>操作</th></tr></thead><tbody>{rawMaterials.map((item) => { const totalW = Number(item.packages || 0) * Number(item.weight || 0); return <tr key={item.id}><td>{item.photo ? <img src={item.photo} alt={item.name} style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6 }} /> : <span style={{ color: "#999", fontSize: 12 }}>无</span>}</td><td>{item.name}</td><td>{item.spec || "-"}</td><td>{item.payer || "-"}</td><td>{item.packages || 0} 包</td><td>{item.weight} 公斤</td><td>{totalW.toFixed(2)} 公斤</td><td>¥{Number(item.unitPrice || 0).toFixed(2)}/公斤</td><td>¥{Number(item.amount).toFixed(2)}</td><td><button className="icon-button" title="编辑" onClick={() => setRawDialog(item)}><Pencil size={16} /></button><button className="icon-button danger-text" title="删除" onClick={() => setRawMaterials((prev) => prev.filter((r) => r.id !== item.id))}><Trash size={16} /></button></td></tr>; })}</tbody></table><div className="prod-summary prod-grand"><span><Calculator size={18} />原材料总额度：<strong>¥{rawTotal.toFixed(2)}</strong></span></div></> : <EmptyState title="还没有原材料" description="点击添加原材料，记录名称、规格、重量和单价。" action={<Button variant="secondary" onClick={() => setRawDialog({ id: "", name: "", spec: "", weight: 0, unitPrice: 0, amount: 0, packages: 0 })}>添加第一个原材料</Button>} />}
       </Section>
-      <RawMaterialDialog open={rawDialog} onClose={() => setRawDialog(null)} onSave={(item) => { setRawMaterials((prev) => item.id ? prev.map((r) => r.id === item.id ? item : r) : [...prev, { ...item, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }]); setRawDialog(null); }} />
+      <RawMaterialDialog open={rawDialog} onClose={() => setRawDialog(null)} onSave={(item) => { setRawMaterials((prev) => item.id ? prev.map((r) => r.id === item.id ? item : r) : [...prev, { ...item, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }]); }} />
     </div>
   );
 }
 
 function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null; onClose: () => void; onSave: (item: RawMaterial) => void }) {
   const [form, setForm] = useState<RawMaterial>({ id: "", name: "", spec: "", weight: 0, unitPrice: 0, amount: 0, packages: 0 });
+  const nameInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { if (open) setForm(open); }, [open]);
   if (!open) return null;
+  const isEditing = !!form.id;
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -50,11 +52,22 @@ function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null
   };
   const calcAmount = (packages: number, weight: number, unitPrice: number) => Number((packages * weight * unitPrice).toFixed(2));
   const totalWeight = Number(form.packages || 0) * Number(form.weight || 0);
+  const handleSave = () => {
+    if (!form.name.trim()) return;
+    onSave(form);
+    if (isEditing) {
+      onClose();
+    } else {
+      setForm({ id: "", name: "", spec: "", weight: 0, unitPrice: 0, amount: 0, packages: 0, payer: "" });
+      setTimeout(() => nameInputRef.current?.focus(), 50);
+    }
+  };
   return (
-    <Modal open title={open.id ? "编辑原材料" : "添加原材料"} description="填写名称、规格、包数、单重(公斤/包)和单价(元/公斤)，总重量=包数×单重，金额=包数×单重×单价" onClose={onClose}>
+    <Modal open title={isEditing ? "编辑原材料" : "添加原材料"} description="填写名称、规格、包数、单重(公斤/包)和单价(元/公斤)，总重量=包数×单重，金额=包数×单重×单价。添加后可连续录入下一条。" onClose={onClose}>
       <div className="form-grid">
-        <label className="form-field"><span>名称<em>必填</em></span><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="例如：棉纱、橡筋" /></label>
+        <label className="form-field"><span>名称<em>必填</em></span><input ref={nameInputRef} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="例如：棉纱、橡筋" /></label>
         <label className="form-field"><span>规格</span><input value={form.spec} onChange={(e) => setForm({ ...form, spec: e.target.value })} placeholder="例如：32支、40支" /></label>
+        <label className="form-field"><span>采购人</span><input value={form.payer || ""} onChange={(e) => setForm({ ...form, payer: e.target.value })} placeholder="谁采购的" /></label>
         <label className="form-field"><span>包数</span><input type="number" step="1" min="0" value={form.packages || ""} onChange={(e) => { const p = Number(e.target.value) || 0; setForm({ ...form, packages: p, amount: calcAmount(p, form.weight, form.unitPrice) }); }} placeholder="包" /></label>
         <label className="form-field"><span>单重(公斤/包)</span><input type="number" step="0.01" value={form.weight || ""} onChange={(e) => { const w = Number(e.target.value) || 0; setForm({ ...form, weight: w, amount: calcAmount(Number(form.packages || 0), w, form.unitPrice) }); }} placeholder="公斤" /></label>
         <label className="form-field"><span>总重量(公斤)</span><input type="number" step="0.01" value={totalWeight.toFixed(2)} readOnly style={{ background: "#f5f5f5" }} placeholder="自动计算" /></label>
@@ -68,7 +81,7 @@ function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null
       </div>
       <footer className="modal-actions">
         <Button variant="ghost" onClick={onClose}>取消</Button>
-        <Button onClick={() => { if (form.name.trim()) onSave(form); }}>保存</Button>
+        <Button onClick={handleSave}>{isEditing ? "保存修改" : "保存并继续"}</Button>
       </footer>
     </Modal>
   );

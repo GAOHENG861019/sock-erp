@@ -144,26 +144,26 @@ describe("仓库管理页面", () => {
     expect(saved[0].type).toBe("in");
   });
 
-  it("当前总余量计算正确（入库减出库）", () => {
+  it("当前总余量计算正确（只计算入库减出库，不关联定型）", () => {
     seedDingxing();
     seedFinishedInventory();
     render(<WarehousePage />);
-    // 10 + 5 - 3 = 12包, 0公斤
+    // 手动入库10+5-3=12包, 0公斤（不包含定型自动入库）
     expect(document.body.textContent).toContain("12");
     expect(document.body.textContent).toContain("0公斤");
   });
 
-  it("成品库存余量按颜色汇总显示(入库减出库)", () => {
+  it("成品库存余量按颜色汇总显示(只计算入库减出库，不关联定型)", () => {
     seedDingxing();
     seedFinishedInventory();
     render(<WarehousePage />);
     const text = document.body.textContent || "";
     expect(text).toContain("按颜色");
-    // dx1: 白色-双, 入库10出库3 = 7包; dx2: 黑色-包, 入库5 = 5包
+    // dx1: 白色-双, 入库10-出库3 = 7; dx2: 黑色-包, 入库5 = 5（不包含定型自动入库）
     expect(text).toContain("白色");
-    expect(text).toContain("7");
+    expect(text).toContain("7包");
     expect(text).toContain("黑色");
-    expect(text).toContain("5");
+    expect(text).toContain("5包");
   });
 
   it("出入库记录显示颜色和规格列", () => {

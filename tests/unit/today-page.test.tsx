@@ -105,7 +105,7 @@ describe("本月总览数据卡片", () => {
     expect(screen.getByText("本月总览")).toBeInTheDocument();
   });
 
-  it("仓库余量按颜色显示包数和公斤数", () => {
+  it("仓库余量按颜色显示包数和公斤数（只计算手动出入库，不关联定型）", () => {
     window.localStorage.setItem("sock-erp-dingxing", JSON.stringify([
       { id: "dx1", name: "A", color: "白色", spec: "包", quantity: 100, unitPrice: 5 },
       { id: "dx2", name: "B", color: "黑色", spec: "包", quantity: 50, unitPrice: 4 },
@@ -117,9 +117,11 @@ describe("本月总览数据卡片", () => {
     renderToday();
     const text = document.body.textContent || "";
     expect(text).toContain("白色");
+    // 白色: 只计算入库30包, 60公斤（不包含定型100）
     expect(text).toContain("30包");
     expect(text).toContain("60公斤");
     expect(text).toContain("黑色");
+    // 黑色: 只计算入库20包, 40公斤（不包含定型50）
     expect(text).toContain("20包");
     expect(text).toContain("40公斤");
   });
@@ -139,5 +141,20 @@ describe("本月总览数据卡片", () => {
     expect(text).toContain("涤纶");
     expect(text).toContain("3包");
     expect(text).toContain("90");
+  });
+
+  it("仓库重量包含原材料库存手动出入库", () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "1", name: "棉纱", spec: "", weight: 50, unitPrice: 40, amount: 4000, packages: 10 },
+    ]));
+    window.localStorage.setItem("sock-erp-material-inventory", JSON.stringify([
+      { id: "mi1", linkedId: "1", packages: 2, quantity: 100, note: "", type: "out" },
+    ]));
+    renderToday();
+    const text = document.body.textContent || "";
+    // 棉纱: 采购10包500公斤 - 出库2包100公斤 = 8包400公斤
+    expect(text).toContain("棉纱");
+    expect(text).toContain("8包");
+    expect(text).toContain("400");
   });
 });

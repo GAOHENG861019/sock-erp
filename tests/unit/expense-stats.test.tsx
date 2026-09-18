@@ -58,7 +58,7 @@ describe("支出统计-包含原材料", () => {
 
   it("无数据时显示空状态", () => {
     render(<ExpenseStatsPage />);
-    expect(screen.getByText("筛选范围内没有支出记录")).toBeInTheDocument();
+    expect(screen.getByText("筛选范围内没有收支记录")).toBeInTheDocument();
   });
 
   it("导出CSV按钮存在", () => {

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   MagnifyingGlass, Plus, FloppyDisk, CheckCircle, WarningCircle, SidebarSimple,
-  ArrowRight, Command, Power, Cloud, List,
+  ArrowRight, Command, Power, Cloud, List, Download,
 } from "@phosphor-icons/react";
 import { api } from "../api";
 import { useWorkspace } from "../WorkspaceContext";
@@ -14,6 +14,7 @@ import { Button, IconButton, Modal, Skeleton, ErrorState, Badge } from "./ui";
 import { AmbientEnvironment, chooseAmbientScene } from "./AmbientEnvironment";
 import { ModuleArtwork, type ModuleArtworkName } from "./ModuleArtwork";
 import type { Entity } from "../types";
+import { AppUpdate, isNativeApp } from "../plugins/AppUpdate";
 
 const groups = [
   { label: "总览", links: [
@@ -28,23 +29,24 @@ const groups = [
   { label: "商品与仓库", links: [
     { to: "/development", label: "商品管理", module: "development", tone: "teal" },
     { to: "/consulting", label: "仓库管理", module: "consulting", tone: "amber" },
-    { to: "/customer", label: "客户中心", module: "consulting", tone: "coral" },
     { to: "/category", label: "分类中心", module: "fitness", tone: "apricot" },
     { to: "/diet", label: "库存盘点", module: "diet", tone: "apricot" },
   ] },
-  { label: "支出管理", links: [
+  { label: "客户中心", links: [
+    { to: "/customer", label: "客户中心", module: "consulting", tone: "coral" },
+  ] },
+  { label: "收支管理", links: [
     { to: "/fitness", label: "原材料采购", module: "fitness", tone: "sage" },
     { to: "/entertainment", label: "机器损耗", module: "entertainment", tone: "indigo" },
     { to: "/sales-order", label: "运货运费", module: "diet", tone: "sky" },
     { to: "/salary", label: "工资支出", module: "fitness", tone: "sage" },
-    { to: "/expense-stats", label: "支出统计", module: "dashboard", tone: "sky" },
     { to: "/payment-income", label: "货款收入", module: "dashboard", tone: "sage" },
+    { to: "/expense-stats", label: "支收统计", module: "dashboard", tone: "sky" },
   ] },
   { label: "审核中心", links: [
     { to: "/purchase-audit", label: "采购审核", module: "entertainment", tone: "indigo" },
     { to: "/outbound-audit", label: "出库审核", module: "dashboard", tone: "sky" },
     { to: "/sales-audit", label: "销货审核", module: "media", tone: "coral" },
-    { to: "/member", label: "会员管理", module: "settings", tone: "graphite" },
   ] },
   { label: "系统", links: [{ to: "/settings", label: "数据与设置", module: "settings", tone: "graphite" }] },
 ] satisfies Array<{ label: string; links: Array<{ to: string; label: string; module: ModuleArtworkName; tone: string }> }>;
@@ -66,19 +68,18 @@ const routeMeta: Record<string, { label: string; module: ModuleArtworkName; tone
   "/dingxing": { label: "定型", module: "development", tone: "amber", index: "04" },
   "/development": { label: "商品管理", module: "development", tone: "teal", index: "05" },
   "/consulting": { label: "仓库管理", module: "consulting", tone: "amber", index: "06" },
-  "/customer": { label: "客户中心", module: "consulting", tone: "coral", index: "07" },
-  "/category": { label: "分类中心", module: "fitness", tone: "apricot", index: "08" },
-  "/fitness": { label: "原材料采购", module: "fitness", tone: "sage", index: "09" },
-  "/diet": { label: "库存盘点", module: "diet", tone: "apricot", index: "10" },
+  "/category": { label: "分类中心", module: "fitness", tone: "apricot", index: "07" },
+  "/diet": { label: "库存盘点", module: "diet", tone: "apricot", index: "08" },
+  "/customer": { label: "客户中心", module: "consulting", tone: "coral", index: "09" },
+  "/fitness": { label: "原材料采购", module: "fitness", tone: "sage", index: "10" },
   "/entertainment": { label: "机器损耗", module: "entertainment", tone: "indigo", index: "11" },
   "/sales-order": { label: "运货运费", module: "diet", tone: "sky", index: "12" },
   "/salary": { label: "工资支出", module: "fitness", tone: "sage", index: "13" },
-  "/expense-stats": { label: "支出统计", module: "dashboard", tone: "sky", index: "14" },
-  "/payment-income": { label: "货款收入", module: "dashboard", tone: "sage", index: "14b" },
-  "/purchase-audit": { label: "采购审核", module: "entertainment", tone: "indigo", index: "15" },
-  "/outbound-audit": { label: "出库审核", module: "dashboard", tone: "sky", index: "16" },
-  "/sales-audit": { label: "销货审核", module: "media", tone: "coral", index: "17" },
-  "/member": { label: "会员管理", module: "settings", tone: "graphite", index: "18" },
+  "/payment-income": { label: "货款收入", module: "dashboard", tone: "sage", index: "14" },
+  "/expense-stats": { label: "支收统计", module: "dashboard", tone: "sky", index: "15" },
+  "/purchase-audit": { label: "采购审核", module: "entertainment", tone: "indigo", index: "16" },
+  "/outbound-audit": { label: "出库审核", module: "dashboard", tone: "sky", index: "17" },
+  "/sales-audit": { label: "销货审核", module: "media", tone: "coral", index: "18" },
   "/settings": { label: "数据与设置", module: "settings", tone: "graphite", index: "19" },
 };
 
@@ -91,7 +92,32 @@ export function AppLayout() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [exitState, setExitState] = useState<"idle" | "saving" | "done" | "error">("idle");
-  const system = useQuery({ queryKey: ["system"], queryFn: api.systemStatus, staleTime: 30_000 });
+  const [updateInfo, setUpdateInfo] = useState<{ version: string; apkUrl: string; downloadUrl: string; changes: string[] } | null>(null);
+  const [updateDismissed, setUpdateDismissed] = useState(false);
+  const [visibleMenuItems, setVisibleMenuItems] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("sock-erp-visible-menu");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch { /* ignore */ }
+    return groups.flatMap((g) => g.links.map((l) => l.to));
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("sock-erp-visible-menu", JSON.stringify(visibleMenuItems)); } catch { /* ignore */ }
+  }, [visibleMenuItems]);
+
+  const toggleMenuItem = (to: string) => {
+    setVisibleMenuItems((prev) => prev.includes(to) ? prev.filter((t) => t !== to) : [...prev, to]);
+  };
+
+  const filteredGroups = groups.map((group) => ({
+    ...group,
+    links: group.links.filter((l) => visibleMenuItems.includes(l.to)),
+  })).filter((g) => g.links.length > 0);
+  const system = useQuery({ queryKey: ["system"], queryFn: async () => { try { return (await api.systemStatus()) ?? null; } catch { return null; } }, staleTime: 30_000 });
   const currentPage = routeMeta[location.pathname] ?? routeMeta["/"];
   const appearance = normalizeAppearance(data.settings.appearance);
   const theme = data.settings.theme === "dark" ? "dark" : "light";
@@ -105,6 +131,41 @@ export function AppLayout() {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
+
+  // 启动时自动检测更新
+  useEffect(() => {
+    const currentVersion = "1.2.0";
+    const dismissed = localStorage.getItem("sock-erp-update-dismissed");
+    if (dismissed === currentVersion) return;
+    (async () => {
+      let info = null;
+      // 优先从Supabase获取
+      try {
+        const res = await fetch("https://naocybheyicuilbvjpbw.supabase.co/rest/v1/app_data?storage_key=eq.latest_app_version&select=data", {
+          headers: { "apikey": "sb_publishable_Os7rBHTmi4zJiUudIwFSeA_uG-uN-YE", "Authorization": "Bearer sb_publishable_Os7rBHTmi4zJiUudIwFSeA_uG-uN-YE" },
+          signal: AbortSignal.timeout(8000)
+        });
+        if (res.ok) {
+          const rows = await res.json();
+          if (rows && rows.length > 0 && rows[0].data) info = rows[0].data;
+        }
+      } catch { /* fallback */ }
+      // CDN fallback
+      if (!info) {
+        const urls = [
+          "https://cdn.jsdelivr.net/gh/GAOHENG861019/sock-erp@master/public/version.json",
+          "https://raw.githubusercontent.com/GAOHENG861019/sock-erp/master/public/version.json",
+        ];
+        for (const url of urls) {
+          try {
+            const res = await fetch(url + "?t=" + Date.now(), { signal: AbortSignal.timeout(8000) });
+            if (res.ok) { info = await res.json(); break; }
+          } catch { /* try next */ }
+        }
+      }
+      if (info && info.version > currentVersion) setUpdateInfo(info);
+    })();
+  }, []);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -181,7 +242,7 @@ export function AppLayout() {
         <div className="brand"><div className="brand-mark" aria-hidden="true"><img src={appearance === "neo" ? "/assets/neo/muzi-app-icon-brand.png" : "/assets/brand/muzi-mark.svg"} alt="" draggable={false} /></div><div className="brand-copy"><strong>袜厂进销存ERP管理系统</strong><span>袜厂本地管理系统</span></div>{appearance === "neo" ? <span className="brand-edition">NEO / SOCK FACTORY ERP</span> : null}</div>
         <Button className="quick-create" onClick={() => setQuickOpen(true)}><Plus size={18} />快速新增</Button>
         <nav aria-label="主导航">
-          {groups.map((group) => (
+          {filteredGroups.map((group) => (
             <div className="nav-group" key={group.label}>
               <span className="nav-label">{group.label}</span>
               {group.links.map(({ to, label, module, tone }) => (
@@ -203,7 +264,7 @@ export function AppLayout() {
             <IconButton label={collapsed ? "展开导航" : "收起导航"} className="desktop-collapse-btn" onClick={() => setCollapsed((value) => !value)}><SidebarSimple size={20} /></IconButton>
             <span className="toolbar-page-icon" data-tone={currentPage.tone} aria-hidden="true"><ModuleArtwork module={currentPage.module} /></span>
             <div className="toolbar-context"><strong>{currentPage.label}</strong><span>{new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date())}</span></div>
-            {appearance === "neo" ? <span className="topbar-index">{currentPage.index} / 19</span> : null}
+            {appearance === "neo" ? <span className="topbar-index">{currentPage.index} / 20</span> : null}
           </div>
           <div className="topbar-actions">
             <button className="search-trigger glass-clear" aria-label="搜索所有内容" title="搜索所有内容" onClick={() => setSearchOpen(true)}><MagnifyingGlass size={18} /><span>搜索所有内容</span><kbd><Command size={12} />K</kbd></button>
@@ -247,7 +308,36 @@ export function AppLayout() {
         </nav>
       </div>
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <QuickCreateModal open={quickOpen} onClose={() => setQuickOpen(false)} />
+      <QuickCreateModal open={quickOpen} onClose={() => setQuickOpen(false)} visibleMenuItems={visibleMenuItems} toggleMenuItem={toggleMenuItem} />
+      <Modal open={Boolean(updateInfo) && !updateDismissed} title="发现新版本" description={`袜厂进销存ERP v${updateInfo?.version} 已发布`} onClose={() => { setUpdateDismissed(true); localStorage.setItem("sock-erp-update-dismissed", updateInfo?.version || ""); }}>
+        <div style={{ padding: "8px 0" }}>
+          {updateInfo?.changes?.length ? (
+            <div style={{ marginBottom: 16 }}>
+              <strong style={{ fontSize: 14 }}>更新内容：</strong>
+              <ul style={{ margin: "8px 0 0 18px", padding: 0, fontSize: 13, color: "#555", lineHeight: 1.8 }}>
+                {updateInfo.changes.map((c, i) => <li key={i}>{c}</li>)}
+              </ul>
+            </div>
+          ) : null}
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <Button onClick={async () => {
+              const apkUrl = updateInfo?.apkUrl || updateInfo?.downloadUrl;
+              if (!apkUrl) return;
+              if (isNativeApp() && updateInfo?.apkUrl) {
+                try {
+                  await AppUpdate.downloadAndInstall({ url: updateInfo.apkUrl });
+                } catch {
+                  window.open(apkUrl, "_system");
+                }
+              } else {
+                window.open(apkUrl, "_system");
+              }
+            }}><Download size={16} />立即更新</Button>
+            <Button variant="secondary" onClick={() => { setUpdateDismissed(true); localStorage.setItem("sock-erp-update-dismissed", updateInfo?.version || ""); }}>稍后再说</Button>
+          </div>
+          <p style={{ fontSize: 12, color: "#999", marginTop: 12 }}>覆盖安装不会丢失任何数据</p>
+        </div>
+      </Modal>
       {exitState === "done" ? <ExitScreen /> : null}
     </div>
   );
@@ -302,7 +392,7 @@ function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) 
   );
 }
 
-function QuickCreateModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function QuickCreateModal({ open, onClose, visibleMenuItems, toggleMenuItem }: { open: boolean; onClose: () => void; visibleMenuItems: string[]; toggleMenuItem: (to: string) => void }) {
   const navigate = useNavigate();
   const allOptions = [
     { label: "本月事项", detail: "安排本月要执行的事情", route: "/today?new=1", tone: "cyan", module: "today" },
@@ -319,6 +409,7 @@ function QuickCreateModal({ open, onClose }: { open: boolean; onClose: () => voi
     { label: "库存盘点", detail: "盘点库存", route: "/diet", tone: "apricot", module: "diet" },
   ];
   const [customize, setCustomize] = useState(false);
+  const [customizeTab, setCustomizeTab] = useState<"quick" | "menu">("quick");
   const [selected, setSelected] = useState<string[]>(() => {
     try {
       const raw = localStorage.getItem("sock-erp-quick-create");
@@ -340,12 +431,36 @@ function QuickCreateModal({ open, onClose }: { open: boolean; onClose: () => voi
     setSelected((prev) => prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]);
   };
 
+  const allMenuItems = groups.flatMap((g) => g.links.map((l) => ({ ...l, group: g.label })));
+
   return (
-    <Modal open={open} title="快速新增" description={customize ? "勾选要显示的快捷入口" : "选择要记录的内容类型"} onClose={onClose}>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+    <Modal open={open} title="快速新增" description={customize ? (customizeTab === "quick" ? "勾选要显示的快捷入口" : "勾选要显示的菜单项") : "选择要记录的内容类型"} onClose={onClose}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        {customize ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button variant={customizeTab === "quick" ? "primary" : "ghost"} size="sm" onClick={() => setCustomizeTab("quick")}>快捷入口</Button>
+            <Button variant={customizeTab === "menu" ? "primary" : "ghost"} size="sm" onClick={() => setCustomizeTab("menu")}>菜单管理</Button>
+          </div>
+        ) : <div />}
         <Button variant="ghost" size="sm" onClick={() => setCustomize(!customize)}>{customize ? "完成" : "自定义"}</Button>
       </div>
-      {customize ? (
+      {customize && customizeTab === "menu" ? (
+        <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
+          {groups.map((group) => (
+            <div key={group.label} style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: "#999", marginBottom: 6, fontWeight: 600 }}>{group.label}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {group.links.map((link) => (
+                  <label key={link.to} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 8, cursor: "pointer", background: visibleMenuItems.includes(link.to) ? "rgba(59,130,246,0.08)" : "transparent", fontSize: 13 }}>
+                    <input type="checkbox" checked={visibleMenuItems.includes(link.to)} onChange={() => toggleMenuItem(link.to)} />
+                    <span>{link.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : customize && customizeTab === "quick" ? (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {allOptions.map((option) => (
             <label key={option.label} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, cursor: "pointer", background: selected.includes(option.label) ? "rgba(59,130,246,0.08)" : "transparent" }}>

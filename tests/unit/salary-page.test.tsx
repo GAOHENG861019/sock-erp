@@ -25,7 +25,7 @@ function addExtraViaModal(name: string, amount: string, note: string) {
   fireEvent.change(within(modal).getByPlaceholderText("员工姓名"), { target: { value: name } });
   fireEvent.change(within(modal).getByPlaceholderText("金额(元)"), { target: { value: amount } });
   fireEvent.change(within(modal).getByPlaceholderText("如：奖金、全勤补贴"), { target: { value: note } });
-  fireEvent.click(within(modal).getByRole("button", { name: "保存" }));
+  fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
 }
 
 beforeEach(() => {
@@ -160,3 +160,4 @@ describe("工资支出页面", () => {
     expect(parsed.some((r: ExtraItem) => r.name === "李四" && r.note === "新补贴" && r.amount === 20)).toBe(true);
   });
 });
+

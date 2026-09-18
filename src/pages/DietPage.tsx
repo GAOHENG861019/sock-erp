@@ -42,23 +42,22 @@ export function DietPage() {
   useEffect(() => { const value = params.get("new"); if (value) setDialog({ type: value }); }, [params]);
   const close = () => { setDialog(null); setParams({}); };
 
-  const rawMaterials = useMemo<RawMaterialItem[]>(() => { try { const raw = localStorage.getItem("sock-erp-raw-materials"); return raw ? JSON.parse(raw) : []; } catch { return []; } }, []);
+  const readArr = (key: string): any[] => {
+    try { const raw = localStorage.getItem(key); if (!raw) return []; const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+  };
+
+  const rawMaterials = useMemo<RawMaterialItem[]>(() => readArr("sock-erp-raw-materials"), []);
   const rawTotal = rawMaterials.reduce((s: number, i: any) => s + Number(i.amount || 0), 0);
 
-  const dingxing = useMemo<DingxingItem[]>(() => {
-    try {
-      const raw = localStorage.getItem("sock-erp-dingxing");
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  }, []);
+  const finishedInventory = useMemo<any[]>(() => readArr("sock-erp-finished-inventory"), []);
+  const materialInventory = useMemo<any[]>(() => readArr("sock-erp-material-inventory"), []);
+  const warehouseTxnCount = finishedInventory.length + materialInventory.length;
 
-  const fanwa = useMemo<ProductionItem[]>(() => {
-    try { const raw = localStorage.getItem("sock-erp-fanwa"); return raw ? JSON.parse(raw) : []; } catch { return []; }
-  }, []);
+  const dingxing = useMemo<DingxingItem[]>(() => readArr("sock-erp-dingxing"), []);
 
-  const fengtou = useMemo<ProductionItem[]>(() => {
-    try { const raw = localStorage.getItem("sock-erp-fengtou"); return raw ? JSON.parse(raw) : []; } catch { return []; }
-  }, []);
+  const fanwa = useMemo<ProductionItem[]>(() => readArr("sock-erp-fanwa"), []);
+
+  const fengtou = useMemo<ProductionItem[]>(() => readArr("sock-erp-fengtou"), []);
 
   // 翻袜按姓名分组
   const fanwaByName = useMemo(() => {
@@ -151,14 +150,14 @@ export function DietPage() {
   return (
     <div>
       <PageHeader icon={<ModuleArtwork module="diet" />} eyebrow="盘点与实际库存" title="库存盘点" description="关联仓库管理与原材料采购，维护盘点物品清单。" actions={<><Button variant="secondary" onClick={() => void saveNow().catch(() => undefined)}><FloppyDisk size={16} />保存</Button><Button onClick={() => void undoLast()}><ArrowCounterClockwise size={17} />撤销</Button></>} />
-      <Section title="关联数据" description="自动关联仓库管理与原材料采购">
+      <Section title=" " description=" ">
         <div className="linked-data-grid">
-          <div className="linked-card"><div className="linked-head"><Package size={18} /><strong>仓库管理</strong></div><p>客户：{data.clients.length} 个 · 仓库项目：{data.consultingProjects.length} 个 · 出入库记录：{data.consultingInteractions.length} 条</p></div>
+          <div className="linked-card"><div className="linked-head"><Package size={18} /><strong>仓库管理</strong></div><p>客户：{data.clients.length} 个 · 仓库项目：{data.consultingProjects.length} 个 · 出入库记录：{warehouseTxnCount} 条</p></div>
           <div className="linked-card"><div className="linked-head"><Package size={18} /><strong>原材料采购</strong></div><p>原材料：{rawMaterials.length} 种 · 总额度：¥{rawTotal.toFixed(2)}</p>{rawMaterials.length ? <div className="raw-mini-list">{rawMaterials.slice(0, 5).map((r: any) => <span key={r.id}>{r.name} ({r.weight}kg)</span>)}</div> : null}</div>
         </div>
       </Section>
 
-      <Section title="成品库存（关联定型）" description="按颜色与规格汇总定型数据">
+      <Section title="成品库存" description="按颜色与规格汇总定型数据">
         {colorSummary.length ? (
           <div className="finished-group-list">
             {colorSummary.map(({ color, list, shuang, bao, amount }) => (

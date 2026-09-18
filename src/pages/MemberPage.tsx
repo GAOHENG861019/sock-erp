@@ -51,6 +51,7 @@ export function MemberPage() {
   const [deleteTarget, setDeleteTarget] = useState<Member | null>(null);
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState<MemberLevel | "全部">("全部");
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     setMembers(readMembers());
@@ -110,8 +111,13 @@ export function MemberPage() {
     }
     writeMembers(list);
     setMembers(list);
-    setModalOpen(false);
-    setEditing(null);
+    if (editing) {
+      setModalOpen(false);
+      setEditing(null);
+    } else {
+      // 连续输入：保持弹窗打开，重置表单
+      setFormKey((k) => k + 1);
+    }
   }
 
   function confirmDelete() {
@@ -232,12 +238,13 @@ export function MemberPage() {
         wide
       >
         <EntityForm
+          key={formKey}
           fields={fields}
           initial={editing ? {
             name: editing.name, phone: editing.phone, level: editing.level,
             points: editing.points, balance: editing.balance, joinDate: editing.joinDate, notes: editing.notes,
           } : { level: "普通", points: 0, balance: 0, joinDate: new Date().toISOString().slice(0, 10) }}
-          submitLabel={editing ? "保存修改" : "添加会员"}
+          submitLabel={editing ? "保存修改" : "保存并继续"}
           onSubmit={handleSubmit}
           onCancel={() => { setModalOpen(false); setEditing(null); }}
         />

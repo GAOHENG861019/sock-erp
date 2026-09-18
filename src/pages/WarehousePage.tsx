@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash, Package, Cube, Calculator, ArrowDown, ArrowUp } from "@phosphor-icons/react";
+import { Plus, Pencil, Trash, Package, Cube, Calculator, ArrowDown, ArrowUp, ArrowCounterClockwise } from "@phosphor-icons/react";
 import { PageHeader, Section, Button, Modal, ConfirmDialog, EmptyState, Badge } from "../components/ui";
 import { ModuleArtwork } from "../components/ModuleArtwork";
 
@@ -22,6 +22,7 @@ type RawMaterialRecord = {
   weight?: number;
   unitPrice?: number;
   amount?: number;
+  packages?: number;
 };
 
 type InventoryItem = {
@@ -55,7 +56,10 @@ function useLocalStorage<T>(key: string, initial: T): [T, (value: T | ((prev: T)
   const [state, setState] = useState<T>(() => {
     try {
       const raw = localStorage.getItem(key);
-      return raw ? (JSON.parse(raw) as T) : initial;
+      if (!raw) return initial;
+      const parsed = JSON.parse(raw) as T;
+      if (Array.isArray(initial) && !Array.isArray(parsed)) return initial;
+      return parsed;
     } catch {
       return initial;
     }
@@ -78,6 +82,9 @@ export function WarehousePage() {
   const [activeTab, setActiveTab] = useState<TabKey>("finished");
   const [finishedList, setFinishedList] = useLocalStorage<InventoryItem[]>(FINISHED_KEY, []);
   const [materialList, setMaterialList] = useLocalStorage<InventoryItem[]>(MATERIAL_KEY, []);
+  const [deletedFinished, setDeletedFinished] = useLocalStorage<InventoryItem[]>(FINISHED_KEY + "-trash", []);
+  const [deletedMaterial, setDeletedMaterial] = useLocalStorage<InventoryItem[]>(MATERIAL_KEY + "-trash", []);
+  const [showTrash, setShowTrash] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
@@ -141,9 +148,24 @@ export function WarehousePage() {
     return Number(item.quantity || 0);
   }
 
-  // 按颜色+规格计算当前库存余量（包数和公斤数）= 入库 - 出库
+  // 按颜色+规格计算当前库存余量（包数和公斤数）
+  // 成品库存：只计算手动入库/出库（不关联定型自动入库）
+  // 原材料库存：原材料采购数据自动入库，再加手动入库/出库
   const balanceByColorSpec = useMemo(() => {
     const groups: Record<string, { packages: number; weightKg: number }> = {};
+
+    // 原材料库存：原材料采购数据自动入库
+    if (activeTab === "material") {
+      rawMaterialList.forEach((r) => {
+        const key = `${r.name}|${r.spec}`;
+        if (!groups[key]) groups[key] = { packages: 0, weightKg: 0 };
+        const pkgs = Number(r.packages || 0);
+        const kg = pkgs * Number(r.weight || 0);
+        groups[key].packages += pkgs;
+        groups[key].weightKg += kg;
+      });
+    }
+
     currentList.forEach((item) => {
       const color = getColor(activeTab, item.linkedId);
       const spec = getSpec(activeTab, item.linkedId);
@@ -173,6 +195,43 @@ export function WarehousePage() {
 
   const totalPackages = Object.values(balanceByColorSpec).reduce((s, v) => s + v.packages, 0);
   const totalWeightKg = Object.values(balanceByColorSpec).reduce((s, v) => s + v.weightKg, 0);
+
+  // 成品总余量（包数）：只计算手动入库-手动出库（不关联定型）
+  const finishedTotalPackages = useMemo(() => {
+    let total = 0;
+    finishedList.forEach((item) => {
+      const sign = item.type === "out" ? -1 : 1;
+      total += sign * Number(item.quantity || 0);
+    });
+    return Math.max(0, total);
+  }, [finishedList]);
+
+  // 原材料总余量（公斤数）：采购自动入库 + 手动入库 - 手动出库
+  const materialTotalWeightKg = useMemo(() => {
+    let total = 0;
+    rawMaterialList.forEach((r) => {
+      const pkgs = Number(r.packages || 0);
+      total += pkgs * Number(r.weight || 0);
+    });
+    materialList.forEach((item) => {
+      const sign = item.type === "out" ? -1 : 1;
+      total += sign * Number(item.quantity || 0);
+    });
+    return Math.max(0, total);
+  }, [rawMaterialList, materialList]);
+
+  // 原材料总余量（包数）：采购自动入库 + 手动入库 - 手动出库
+  const materialTotalPackages = useMemo(() => {
+    let total = 0;
+    rawMaterialList.forEach((r) => {
+      total += Number(r.packages || 0);
+    });
+    materialList.forEach((item) => {
+      const sign = item.type === "out" ? -1 : 1;
+      total += sign * Number(item.packages || 0);
+    });
+    return Math.max(0, total);
+  }, [rawMaterialList, materialList]);
 
   function updateList(tab: TabKey, list: InventoryItem[]) {
     if (tab === "finished") setFinishedList(list);
@@ -207,9 +266,15 @@ export function WarehousePage() {
     e.preventDefault();
     if (!formLinkedId) return;
     const list = activeTab === "finished" ? [...finishedList] : [...materialList];
-    const quantity = Number(formQuantity) || 0;
+    let quantity = Number(formQuantity) || 0;
     const packages = Number(formPackages) || 0;
     const weightKg = Number(formWeightKg) || 0;
+    // 原材料：如果有关联记录且有每包重量，总公斤数自动计算
+    if (!isFinished) {
+      const linked = rawMaterialList.find((r) => r.id === formLinkedId);
+      const perPkg = linked ? Number(linked.weight || 0) : 0;
+      if (perPkg > 0) quantity = packages * perPkg;
+    }
     const note = formNote.trim();
     if (editing) {
       const idx = list.findIndex((i) => i.id === editing.id);
@@ -231,9 +296,35 @@ export function WarehousePage() {
 
   function confirmDelete() {
     if (!deleteTarget) return;
-    const list = (activeTab === "finished" ? finishedList : materialList).filter((i) => i.id !== deleteTarget.id);
-    updateList(activeTab, list);
+    if (activeTab === "finished") {
+      setDeletedFinished((prev) => [...prev, deleteTarget!]);
+      setFinishedList((prev) => prev.filter((i) => i.id !== deleteTarget!.id));
+    } else {
+      setDeletedMaterial((prev) => [...prev, deleteTarget!]);
+      setMaterialList((prev) => prev.filter((i) => i.id !== deleteTarget!.id));
+    }
     setDeleteTarget(null);
+  }
+
+  function restoreItem(id: string) {
+    if (activeTab === "finished") {
+      const item = deletedFinished.find((i) => i.id === id);
+      if (item) {
+        setFinishedList((prev) => [...prev, item]);
+        setDeletedFinished((prev) => prev.filter((i) => i.id !== id));
+      }
+    } else {
+      const item = deletedMaterial.find((i) => i.id === id);
+      if (item) {
+        setMaterialList((prev) => [...prev, item]);
+        setDeletedMaterial((prev) => prev.filter((i) => i.id !== id));
+      }
+    }
+  }
+
+  function permanentDelete(id: string) {
+    if (activeTab === "finished") setDeletedFinished((prev) => prev.filter((i) => i.id !== id));
+    else setDeletedMaterial((prev) => prev.filter((i) => i.id !== id));
   }
 
   const isFinished = activeTab === "finished";
@@ -265,7 +356,7 @@ export function WarehousePage() {
         >
           <Package size={16} />
           成品库存
-          <Badge tone="neutral">{finishedList.length}</Badge>
+          <Badge tone="neutral">{finishedTotalPackages}包</Badge>
         </button>
         <button
           role="tab"
@@ -275,7 +366,7 @@ export function WarehousePage() {
         >
           <Cube size={16} />
           原材料库存
-          <Badge tone="neutral">{materialList.length}</Badge>
+          <Badge tone="neutral">{materialTotalPackages}包</Badge>
         </button>
       </div>
 
@@ -400,7 +491,7 @@ export function WarehousePage() {
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditing(null); }}
         title={editing ? `编辑${isFinished ? "成品" : "原材料"}${txnType === "out" ? "出库" : "入库"}` : `${txnType === "out" ? "出库" : "入库"}${isFinished ? "成品" : "原材料"}`}
-        description={isFinished ? "选择关联的定型记录，填写包数和公斤数。" : "选择关联的原材料记录，填写包数和公斤数。"}
+        description={isFinished ? "选择关联的定型记录，自动填充包数，支持一键入库出库。" : "选择关联的原材料记录，自动填充包数和公斤数，支持一键入库出库。"}
       >
         <form className="entity-form" onSubmit={handleSubmit}>
           <div className="form-grid">
@@ -417,18 +508,44 @@ export function WarehousePage() {
             </label>
             <label className="form-field">
               <span>{isFinished ? "关联定型" : "关联原材料"}<em>必填</em></span>
-              <select value={formLinkedId} onChange={(e) => setFormLinkedId(e.target.value)} required>
+              <select value={formLinkedId} onChange={(e) => {
+                const id = e.target.value;
+                setFormLinkedId(id);
+                // 一键填充：选择关联后自动填入包数
+                if (isFinished) {
+                  const d = dingxingList.find((x) => x.id === id);
+                  if (d) setFormQuantity(String(d.quantity || ""));
+                } else {
+                  const r = rawMaterialList.find((x) => x.id === id);
+                  if (r) {
+                    setFormPackages(String(r.packages || ""));
+                    setFormQuantity(String((Number(r.packages || 0) * Number(r.weight || 0)) || ""));
+                  }
+                }
+              }} required>
                 <option value="">请选择</option>
                 {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </label>
             <label className="form-field">
               <span>包数</span>
-              <input type="number" step="1" min="0" value={isFinished ? formQuantity : formPackages} onChange={(e) => isFinished ? setFormQuantity(e.target.value) : setFormPackages(e.target.value)} placeholder="包" />
+              <input type="number" step="any" min="0" value={isFinished ? formQuantity : formPackages} onChange={(e) => isFinished ? setFormQuantity(e.target.value) : setFormPackages(e.target.value)} placeholder="包" />
             </label>
             <label className="form-field">
               <span>公斤数</span>
-              <input type="number" step="0.01" min="0" value={isFinished ? formWeightKg : formQuantity} onChange={(e) => isFinished ? setFormWeightKg(e.target.value) : setFormQuantity(e.target.value)} placeholder="公斤" />
+              <input type="number" step="any" min="0" value={isFinished ? formWeightKg : formQuantity} onChange={(e) => isFinished ? setFormWeightKg(e.target.value) : setFormQuantity(e.target.value)} placeholder="公斤" />
+            </label>
+            <label className="form-field">
+              <span>总公斤数</span>
+              <div style={{ padding: "8px 12px", background: "#f5f5f5", borderRadius: 6, fontSize: 14, color: "#666", minHeight: 38, display: "flex", alignItems: "center" }}>
+                {(() => {
+                  if (isFinished) return formWeightKg || "0";
+                  const pkgs = Number(formPackages) || 0;
+                  const linked = rawMaterialList.find((r) => r.id === formLinkedId);
+                  const perPkg = linked ? Number(linked.weight || 0) : 0;
+                  return perPkg > 0 ? String(pkgs * perPkg) : (formQuantity || "0");
+                })()} 公斤
+              </div>
             </label>
             <label className="form-field">
               <span>备注</span>
@@ -441,6 +558,34 @@ export function WarehousePage() {
           </footer>
         </form>
       </Modal>
+
+      {/* 回收站 */}
+      {((isFinished && deletedFinished.length > 0) || (!isFinished && deletedMaterial.length > 0)) && (
+        <Section title={`已删除记录 (${isFinished ? deletedFinished.length : deletedMaterial.length})`} description="可恢复或永久删除">
+          <button className="link-button" onClick={() => setShowTrash(!showTrash)} style={{ marginBottom: 12 }}>
+            {showTrash ? "收起" : "展开"}已删除记录
+          </button>
+          {showTrash && (
+            <table className="prod-table">
+              <thead><tr><th>日期</th><th>类型</th><th>关联</th><th>数量</th><th>操作</th></tr></thead>
+              <tbody>
+                {(isFinished ? deletedFinished : deletedMaterial).map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.date || "-"}</td>
+                    <td>{item.type === "out" ? "出库" : "入库"}</td>
+                    <td>{item.linkedId || "-"}</td>
+                    <td>{item.quantity || item.packages || 0}</td>
+                    <td>
+                      <button className="icon-btn" onClick={() => restoreItem(item.id)} aria-label="恢复"><ArrowCounterClockwise size={15} /></button>
+                      <button className="icon-btn danger" onClick={() => permanentDelete(item.id)} aria-label="永久删除"><Trash size={15} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Section>
+      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}

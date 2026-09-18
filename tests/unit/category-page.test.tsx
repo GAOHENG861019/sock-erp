@@ -41,7 +41,7 @@ describe("分类中心页面", () => {
     const descInput = within(modal).getByLabelText(/分类说明/);
     fireEvent.change(descInput, { target: { value: "纯棉袜子" } });
 
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
 
     expect(await screen.findByText("棉袜")).toBeInTheDocument();
     expect(screen.getByText("纯棉袜子")).toBeInTheDocument();
@@ -54,7 +54,7 @@ describe("分类中心页面", () => {
 
     const modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "纱线" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
 
     expect(await screen.findByText("纱线")).toBeInTheDocument();
   });
@@ -65,8 +65,10 @@ describe("分类中心页面", () => {
     fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
     let modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "旧名称" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
     expect(await screen.findByText("旧名称")).toBeInTheDocument();
+    // 关闭添加弹窗
+    fireEvent.click(within(modal).getByRole("button", { name: /取消/ }));
 
     // 点击编辑
     fireEvent.click(screen.getByLabelText("编辑"));
@@ -84,8 +86,10 @@ describe("分类中心页面", () => {
     fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
     const modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "待删除" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
     expect(await screen.findByText("待删除")).toBeInTheDocument();
+    // 关闭添加弹窗
+    fireEvent.click(within(modal).getByRole("button", { name: /取消/ }));
 
     // 点击删除图标
     fireEvent.click(screen.getByLabelText("删除"));
@@ -110,7 +114,7 @@ describe("分类中心页面", () => {
     fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
     let modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "商品A" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
     expect(await screen.findByText("商品A")).toBeInTheDocument();
 
     // 切换到原材料，不应看到商品A
@@ -125,14 +129,14 @@ describe("分类中心页面", () => {
     fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
     let modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "第一个" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
     expect(await screen.findByText("第一个")).toBeInTheDocument();
 
     // 添加第二个分类
     fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
     modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "第二个" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
     expect(await screen.findByText("第二个")).toBeInTheDocument();
 
     // 序号应显示1和2
@@ -184,13 +188,16 @@ describe("分类中心页面", () => {
   it("删除分类后序号重新排列", async () => {
     renderPage();
     // 添加3个分类
+    let modal: HTMLElement;
     for (const name of ["A", "B", "C"]) {
       fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
-      const modal = screen.getByRole("dialog");
+      modal = screen.getByRole("dialog");
       fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: name } });
-      fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+      fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
       await screen.findByText(name);
     }
+    // 关闭添加弹窗
+    fireEvent.click(within(modal!).getByRole("button", { name: /取消/ }));
 
     // 删除第二个
     const deleteButtons = screen.getAllByLabelText("删除");
@@ -230,7 +237,7 @@ describe("分类中心页面", () => {
     const modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "船袜" } });
     fireEvent.change(within(modal).getByLabelText(/关联定型/), { target: { value: "dx1" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
 
     expect(await screen.findByText("船袜")).toBeInTheDocument();
     expect(screen.getByText(/关联：白色 \/ 双/)).toBeInTheDocument();
@@ -247,7 +254,7 @@ describe("分类中心页面", () => {
     const modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "纱线分类" } });
     fireEvent.change(within(modal).getByLabelText(/关联原材料/), { target: { value: "rm1" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
 
     expect(await screen.findByText("纱线分类")).toBeInTheDocument();
     expect(screen.getByText(/关联：3075纱线/)).toBeInTheDocument();
@@ -265,8 +272,10 @@ describe("分类中心页面", () => {
     let modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "船袜" } });
     fireEvent.change(within(modal).getByLabelText(/关联定型/), { target: { value: "dx1" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
     expect(await screen.findByText(/关联：白色 \/ 双/)).toBeInTheDocument();
+    // 关闭添加弹窗
+    fireEvent.click(within(modal).getByRole("button", { name: /取消/ }));
 
     // 编辑，改为关联 dx2
     fireEvent.click(screen.getByLabelText("编辑"));
@@ -287,7 +296,7 @@ describe("分类中心页面", () => {
     fireEvent.click(screen.getByRole("button", { name: /添加商品分类/ }));
     const modal = screen.getByRole("dialog");
     fireEvent.change(within(modal).getByLabelText(/分类名称/), { target: { value: "无关联分类" } });
-    fireEvent.click(within(modal).getByRole("button", { name: /添加分类/ }));
+    fireEvent.click(within(modal).getByRole("button", { name: /保存并继续/ }));
 
     expect(await screen.findByText("无关联分类")).toBeInTheDocument();
     expect(screen.queryByText(/关联：/)).not.toBeInTheDocument();

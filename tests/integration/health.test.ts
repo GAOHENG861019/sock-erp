@@ -21,19 +21,20 @@ describe("application health", () => {
         buildId: "development",
         status: "ok",
         database: "ok",
-        schemaVersion: "002_workout_body_part.sql",
+        schemaVersion: "003_clients_contact.sql",
       });
     } finally {
       await app.close();
     }
   });
 
-  it("rejects state-changing requests from non-local browser origins", async () => {
+  it("allows state-changing requests from any origin for internal LAN use", async () => {
     directory = makeTestDirectory("origin");
     const app = await buildApp({ dataDir: directory, autoBackup: false });
     try {
-      const response = await app.inject({ method: "POST", url: "/api/collections/planItems", headers: { origin: "https://example.com" }, payload: { title: "不应写入", plan_date: "2026-08-02" } });
-      expect(response.statusCode).toBe(403);
+      const response = await app.inject({ method: "POST", url: "/api/collections/planItems", headers: { origin: "https://example.com" }, payload: { title: "局域网访问", plan_date: "2026-08-02" } });
+      expect(response.statusCode).toBe(201);
+      expect(response.headers["access-control-allow-origin"]).toBe("https://example.com");
     } finally {
       await app.close();
     }

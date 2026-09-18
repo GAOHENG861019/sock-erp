@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist_new/
 dist-server/
 *.log
 data/
@@ -26,3 +27,11 @@ android/build/
 android/captures/
 android/.idea/
 *.iml
+
+# 本地推送脚本（含密钥，禁止提交）
+push-to-github.ps1
+push_contents.py
+push_to_github.py
+# 临时/构建产物
+dist_new/
+blob_progress.json

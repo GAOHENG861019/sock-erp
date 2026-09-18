@@ -47,7 +47,7 @@ describe("库存盘点页面", () => {
 
   it("显示成品库存和原材料库存两个区域", () => {
     renderPage();
-    expect(screen.getByText("成品库存（关联定型）")).toBeInTheDocument();
+    expect(screen.getByText("成品库存")).toBeInTheDocument();
     expect(screen.getByText("原材料库存（关联原材料采购）")).toBeInTheDocument();
   });
 

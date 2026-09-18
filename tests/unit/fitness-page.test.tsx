@@ -91,7 +91,7 @@ describe("原材料采购", () => {
     // 修改名称
     const nameInput = within(modal).getByDisplayValue("棉纱");
     fireEvent.change(nameInput, { target: { value: "棉纱2" } });
-    fireEvent.click(within(modal).getByText("保存"));
+    fireEvent.click(within(modal).getByText("保存修改"));
     expect(screen.getByText("棉纱2")).toBeInTheDocument();
   });
 });

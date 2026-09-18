@@ -59,7 +59,13 @@ export function TodayPage() {
 
   // 业务数据总览
   const readLS = <T,>(key: string, fallback: T): T => {
-    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; }
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw) as T;
+      if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback;
+      return parsed;
+    } catch { return fallback; }
   };
   const dingxing = readLS<any[]>("sock-erp-dingxing", []);
   // 成品数量：关联定型，按包统计
@@ -75,11 +81,12 @@ export function TodayPage() {
     });
     return groups;
   }, [dingxing]);
-  // 仓库余量：关联仓库管理（成品库存），按颜色统计包数和公斤数（入库减出库）
+  // 仓库余量：关联仓库管理（成品库存），只计算手动入库/出库（不关联定型自动入库）
   const finishedInv = readLS<any[]>("sock-erp-finished-inventory", []);
   const dxMap: Record<string, any> = {};
   dingxing.forEach((d) => { dxMap[d.id] = d; });
   const warehouseByColor: Record<string, { bao: number; kg: number }> = {};
+  // 手动入库/出库记录
   finishedInv.forEach((inv) => {
     const dx = dxMap[inv.linkedId];
     const color = dx?.color || "未分类";
@@ -91,14 +98,27 @@ export function TodayPage() {
   const warehouseTotalBao = Object.values(warehouseByColor).reduce((s, v) => s + v.bao, 0);
   const warehouseTotalKg = Object.values(warehouseByColor).reduce((s, v) => s + v.kg, 0);
   const warehouseColorText = Object.entries(warehouseByColor).map(([c, v]) => `${c}:${v.bao}包${v.kg}公斤`).join(" ") || "暂无库存";
-  // 仓库重量：关联原材料采购，按名称统计包数和总重量(包数×单重)
+  // 仓库重量：关联原材料采购+原材料库存手动出入库，按名称统计包数和总重量
   const rawMaterials = readLS<any[]>("sock-erp-raw-materials", []);
+  const materialInv = readLS<any[]>("sock-erp-material-inventory", []);
+  const rawMap: Record<string, any> = {};
+  rawMaterials.forEach((m) => { rawMap[m.id] = m; });
   const materialByName: Record<string, { bao: number; kg: number }> = {};
+  // 原材料采购自动入库
   rawMaterials.forEach((m) => {
     const name = m.name || "未分类";
     if (!materialByName[name]) materialByName[name] = { bao: 0, kg: 0 };
     materialByName[name].bao += Number(m.packages || 0);
     materialByName[name].kg += Number(m.packages || 0) * Number(m.weight || 0);
+  });
+  // 原材料库存手动入库/出库
+  materialInv.forEach((inv) => {
+    const raw = rawMap[inv.linkedId];
+    const name = raw?.name || "未分类";
+    if (!materialByName[name]) materialByName[name] = { bao: 0, kg: 0 };
+    const sign = inv.type === "out" ? -1 : 1;
+    materialByName[name].bao += sign * Number(inv.packages || 0);
+    materialByName[name].kg += sign * Number(inv.quantity || 0);
   });
   const materialTotalBao = Object.values(materialByName).reduce((s, v) => s + v.bao, 0);
   const materialTotalKg = Object.values(materialByName).reduce((s, v) => s + v.kg, 0);
@@ -147,7 +167,7 @@ export function TodayPage() {
           </div>
         ) : <p className="quiet-line">暂无定型记录</p>}
       </Section>
-      <Section title="仓库余量按颜色" description="关联仓库管理成品库存，按颜色分别显示包数和公斤数">
+      <Section title="仓库余量按颜色" description="关联仓库管理成品库存出入库记录，按颜色分别显示包数和公斤数">
         {Object.keys(warehouseByColor).length ? (
           <div className="prod-overview-grid">
             {Object.entries(warehouseByColor).map(([color, stats]) => (
@@ -161,7 +181,7 @@ export function TodayPage() {
           </div>
         ) : <p className="quiet-line">暂无仓库库存</p>}
       </Section>
-      <Section title="仓库重量按原材料" description="关联原材料采购，按名称分别显示包数和总重量">
+      <Section title="仓库重量按原材料" description="关联原材料采购和原材料库存出入库，按名称分别显示包数和总重量">
         {Object.keys(materialByName).length ? (
           <div className="prod-overview-grid">
             {Object.entries(materialByName).map(([name, stats]) => (

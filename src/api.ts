@@ -11,6 +11,12 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: init?.body ? { "Content-Type": "application/json", ...init.headers } : init?.headers,
   });
+  const contentType = response.headers.get("content-type") || "";
+  // 无后端服务器时（Capacitor APP/PWA离线），静态服务器会返回 index.html
+  // 此时返回 undefined，让调用方使用默认值
+  if (contentType.includes("text/html")) {
+    return undefined as T;
+  }
   if (!response.ok) {
     const result = await response.json().catch(() => null);
     throw new ApiError(result?.error?.message ?? `操作失败（${response.status}）`, response.status);
@@ -53,6 +59,7 @@ export const api = {
   createBackup: (label = "", keep = false) => request<BackupRecord>("/api/backups", { method: "POST", body: JSON.stringify({ label, keep }) }),
   updateBackup: (id: string, input: { label?: string; keep?: boolean }) => request<BackupRecord>(`/api/backups/${id}/metadata`, { method: "PATCH", body: JSON.stringify(input) }),
   restoreBackup: (id: string) => request<{ restored: boolean }>(`/api/backups/${id}/restore`, { method: "POST" }),
+  deleteBackup: (id: string) => request<{ deleted: boolean; id: string }>(`/api/backups/${id}`, { method: "DELETE" }),
   exportAll: () => request<{ filename: string; path: string; size: number; downloadUrl: string }>("/api/export", { method: "POST" }),
   baiduBackupConfig: () => request<{ enabled: boolean; netdiskPath: string; lastSyncAt: string | null; lastSyncStatus: string; lastSyncError: string | null; syncCount: number }>("/api/baidu-backup/config"),
   updateBaiduBackupConfig: (input: { enabled?: boolean; netdiskPath?: string }) => request("/api/baidu-backup/config", { method: "POST", body: JSON.stringify(input) }),

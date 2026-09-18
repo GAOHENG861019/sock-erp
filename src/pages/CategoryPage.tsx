@@ -131,6 +131,7 @@ export function CategoryPage() {
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     setProductList(readCategories("product"));
@@ -220,13 +221,13 @@ export function CategoryPage() {
       const d = dingxingList.find((x) => x.id === cat.linkedId);
       const bal = finishedBalance[cat.linkedId];
       const base = d ? `${d.color ?? ""} / ${d.spec ?? ""}` : "关联已删除";
-      if (bal) return `${base} | 库存：${bal.packages}包 / ${bal.weightKg}公斤`;
+      if (bal) return `${base} | 余量：${Math.max(0, bal.packages)}包 / ${Math.max(0, bal.weightKg)}公斤`;
       return base;
     }
     const r = rawMaterialList.find((x) => x.id === cat.linkedId);
     const bal = materialBalance[cat.linkedId];
     const base = r ? r.name ?? "" : "关联已删除";
-    if (bal) return `${base} | 库存：${bal.packages}包 / ${bal.weightKg}公斤`;
+    if (bal) return `${base} | 余量：${Math.max(0, bal.packages)}包 / ${Math.max(0, bal.weightKg)}公斤`;
     return base;
   }
 
@@ -271,8 +272,13 @@ export function CategoryPage() {
       });
     }
     updateList(activeType, list);
-    setModalOpen(false);
-    setEditing(null);
+    if (editing) {
+      setModalOpen(false);
+      setEditing(null);
+    } else {
+      // 连续输入：保持弹窗打开，重置表单
+      setFormKey((k) => k + 1);
+    }
   }
 
   function confirmDelete() {
@@ -372,7 +378,7 @@ export function CategoryPage() {
                   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", background: "#f8f9fa", borderRadius: 8, marginBottom: 8 }}>
                     <strong style={{ fontSize: 15 }}>{groupKey}</strong>
                     <span style={{ fontSize: 13, color: "#666" }}>{cats.length} 个分类</span>
-                    <span style={{ marginLeft: "auto", fontSize: 13, color: "#3498db" }}>{total.packages}包 / {total.weightKg}公斤</span>
+                    <span style={{ marginLeft: "auto", fontSize: 13, color: "#3498db" }}>{Math.max(0, total.packages)}包 / {Math.max(0, total.weightKg)}公斤</span>
                   </div>
                   <div className="category-list">
                     {cats.map((cat, idx) => (
@@ -421,9 +427,10 @@ export function CategoryPage() {
         description="分类名称必填，序号自动分配，保存后可拖拽调整顺序。"
       >
         <EntityForm
+          key={formKey}
           fields={fields}
           initial={editing ? { name: editing.name, description: editing.description, linkedId: editing.linkedId ?? "" } : {}}
-          submitLabel={editing ? "保存修改" : "添加分类"}
+          submitLabel={editing ? "保存修改" : "保存并继续"}
           onSubmit={handleSubmit}
           onCancel={() => { setModalOpen(false); setEditing(null); }}
         />
