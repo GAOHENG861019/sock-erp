@@ -7,10 +7,16 @@ import { normalizeAppearance, type Appearance } from "./appearance";
 
 export type Theme = "light" | "dark";
 
-const UI_PREFS_KEY = "sock-erp-ui-preferences";
+/** 界面偏好在 localStorage 中的存储键（也被云同步按 sock-erp- 前缀同步）。 */
+export const UI_PREFS_STORAGE_KEY = "sock-erp-ui-preferences";
 
 /** 本地界面偏好变更事件（同一文档内 localStorage 写入不会触发 storage 事件，需手动派发）。 */
 export const UI_PREFS_CHANGED_EVENT = "sock-erp-ui-prefs-changed";
+
+/** 判断某个 localStorage 键是否为界面偏好键（用于云同步写入后通知界面刷新）。 */
+export function isUiPreferencesStorageKey(key: string | null | undefined): boolean {
+  return key === UI_PREFS_STORAGE_KEY;
+}
 
 export function emitUiPreferencesChanged(): void {
   try {
@@ -36,7 +42,7 @@ function isUiPrefKey(key: string): key is keyof UiPreferences {
 /** 读取本地保存的界面偏好；非法或缺失时返回空对象（交由归一化给默认值）。 */
 export function readUiPreferences(): UiPreferences {
   try {
-    const raw = localStorage.getItem(UI_PREFS_KEY);
+    const raw = localStorage.getItem(UI_PREFS_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const prefs: UiPreferences = {};
@@ -67,7 +73,7 @@ export function saveUiPreferences(patch: Record<string, unknown>): UiPreferences
     }
   }
   try {
-    localStorage.setItem(UI_PREFS_KEY, JSON.stringify(next));
+    localStorage.setItem(UI_PREFS_STORAGE_KEY, JSON.stringify(next));
   } catch {
     // 隐私模式 / 存储被禁用时忽略，界面仍可在当前会话内切换
   }

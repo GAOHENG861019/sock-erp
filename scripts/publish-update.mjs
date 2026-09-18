@@ -32,7 +32,15 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 const args = process.argv.slice(2);
 const notes = (() => {
-  // 优先用环境变量传中文更新说明，避免 Windows PowerShell 命令行参数编码导致乱码
+  // 最可靠：从 UTF-8 文件读取中文更新说明（彻底绕过 PowerShell/命令行编码问题）
+  if (process.env.PUBLISH_NOTES_FILE) {
+    try {
+      return readFileSync(process.env.PUBLISH_NOTES_FILE, "utf8").trim();
+    } catch (error) {
+      console.warn(`无法读取 PUBLISH_NOTES_FILE：${error.message}`);
+    }
+  }
+  // 其次用环境变量（部分终端中文仍可能乱码）
   if (process.env.PUBLISH_NOTES) return process.env.PUBLISH_NOTES;
   const i = args.indexOf("--notes");
   return i >= 0 ? args[i + 1] : "";

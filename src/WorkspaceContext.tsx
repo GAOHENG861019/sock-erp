@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
 import type { WorkspaceState } from "./types";
-import { readUiPreferences, UI_PREFS_CHANGED_EVENT } from "./ui-preferences";
+import { readUiPreferences, isUiPreferencesStorageKey, UI_PREFS_CHANGED_EVENT } from "./ui-preferences";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type SaveHandler = () => Promise<void> | void;
@@ -35,11 +35,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // 界面风格/主题在无后端环境（手机 APP）下从 localStorage 兜底；后端有值时后端优先。
   // 本地偏好保存后会派发事件，驱动这里重新计算（手机端 query.data 恒为 undefined）。
+  // 同时监听云同步：其他设备/初始化拉取写入偏好键后也要刷新（多设备实时同步）。
   const [prefsTick, setPrefsTick] = useState(0);
   useEffect(() => {
-    const handler = () => setPrefsTick((t) => t + 1);
-    window.addEventListener(UI_PREFS_CHANGED_EVENT, handler);
-    return () => window.removeEventListener(UI_PREFS_CHANGED_EVENT, handler);
+    const bump = () => setPrefsTick((t) => t + 1);
+    const onCloudSync = (event: Event) => {
+      const key = (event as CustomEvent<{ key?: string }>).detail?.key;
+      if (isUiPreferencesStorageKey(key)) bump();
+    };
+    window.addEventListener(UI_PREFS_CHANGED_EVENT, bump);
+    window.addEventListener("cloud-storage-sync", onCloudSync);
+    window.addEventListener("cloud-storage-local", onCloudSync);
+    return () => {
+      window.removeEventListener(UI_PREFS_CHANGED_EVENT, bump);
+      window.removeEventListener("cloud-storage-sync", onCloudSync);
+      window.removeEventListener("cloud-storage-local", onCloudSync);
+    };
   }, []);
   const data: WorkspaceState = useMemo(() => {
     const base = query.data ?? emptyState;

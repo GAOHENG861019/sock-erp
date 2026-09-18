@@ -1,4 +1,5 @@
 import { supabase, SUPABASE_CONFIG } from "./supabase";
+import { emitUiPreferencesChanged, isUiPreferencesStorageKey } from "./ui-preferences";
 
 // 保存原始localStorage方法（在任何patch之前捕获）
 const originalLocalStorage = {
@@ -257,6 +258,7 @@ async function pullFromCloud(): Promise<number> {
     if (error) throw error;
 
     let merged = 0;
+    let uiPrefsChanged = false;
     const records = (data as CloudRecord[]) || [];
     const meta = getSyncMeta();
 
@@ -274,6 +276,7 @@ async function pullFromCloud(): Promise<number> {
         originalLocalStorage.setItem(record.storage_key, cloudValue);
         meta[record.storage_key] = record.updated_at;
         merged++;
+        if (isUiPreferencesStorageKey(record.storage_key)) uiPrefsChanged = true;
       } else if (record.device_id !== deviceId) {
         // 来自其他设备，用独立 meta 中的时间戳比较，不再读取业务数据内的字段
         const localTime = meta[record.storage_key];
@@ -282,11 +285,14 @@ async function pullFromCloud(): Promise<number> {
           originalLocalStorage.setItem(record.storage_key, cloudValue);
           meta[record.storage_key] = record.updated_at;
           merged++;
+          if (isUiPreferencesStorageKey(record.storage_key)) uiPrefsChanged = true;
         }
       }
     }
 
     setSyncMeta(meta);
+    // 初始化拉取写入了界面偏好时，通知界面刷新（手机端无后端，依赖本地偏好）
+    if (uiPrefsChanged) emitUiPreferencesChanged();
     setStatus("idle");
     return merged;
   } catch (error) {

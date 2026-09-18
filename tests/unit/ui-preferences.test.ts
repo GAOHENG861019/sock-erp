@@ -4,6 +4,8 @@ import {
   saveUiPreferences,
   normalizeTheme,
   emitUiPreferencesChanged,
+  isUiPreferencesStorageKey,
+  UI_PREFS_STORAGE_KEY,
   UI_PREFS_CHANGED_EVENT,
 } from "../../src/ui-preferences";
 
@@ -69,5 +71,16 @@ describe("ui-preferences 本地界面偏好", () => {
     saveUiPreferences({ appearance: "neo" });
     saveUiPreferences({ theme: "dark" });
     expect(readUiPreferences()).toEqual({ appearance: "neo", theme: "dark" });
+  });
+
+  it("存储键带有 sock-erp- 前缀（会被云同步覆盖）", () => {
+    expect(UI_PREFS_STORAGE_KEY).toBe("sock-erp-ui-preferences");
+  });
+
+  it("isUiPreferencesStorageKey 仅识别偏好键", () => {
+    expect(isUiPreferencesStorageKey("sock-erp-ui-preferences")).toBe(true);
+    expect(isUiPreferencesStorageKey("sock-erp-fanwa")).toBe(false);
+    expect(isUiPreferencesStorageKey(null)).toBe(false);
+    expect(isUiPreferencesStorageKey(undefined)).toBe(false);
   });
 });
