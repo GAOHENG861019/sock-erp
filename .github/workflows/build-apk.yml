@@ -46,7 +46,9 @@ jobs:
 
       - name: 构建 Debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: 重命名 APK
         run: |
