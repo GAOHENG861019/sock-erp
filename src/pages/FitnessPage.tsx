@@ -5,11 +5,49 @@ import { ModuleArtwork } from "../components/ModuleArtwork";
 
 type RawMaterial = { id: string; name: string; spec: string; weight: number; unitPrice: number; amount: number; packages?: number; photo?: string; payer?: string };
 
+const RAW_MATERIALS_KEY = "sock-erp-raw-materials";
+
+function readRawMaterials(): RawMaterial[] {
+  try {
+    const raw = localStorage.getItem(RAW_MATERIALS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function useRawMaterials() {
-  const [items, setItems] = useState<RawMaterial[]>(() => {
-    try { const raw = localStorage.getItem("sock-erp-raw-materials"); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : []; } catch { return []; }
-  });
-  useEffect(() => { try { localStorage.setItem("sock-erp-raw-materials", JSON.stringify(items)); } catch { /* ignore */ } }, [items]);
+  const [items, setItems] = useState<RawMaterial[]>(readRawMaterials);
+
+  // 持久化：仅当本地存储与当前状态不同时才写入。云端拉取/实时推送会先把数据写入
+  // 本地，再经事件同步到状态；相同则跳过，避免把同一份云端数据回写并多上传一次。
+  useEffect(() => {
+    try {
+      const next = JSON.stringify(items);
+      if (localStorage.getItem(RAW_MATERIALS_KEY) !== next) {
+        localStorage.setItem(RAW_MATERIALS_KEY, next);
+      }
+    } catch { /* ignore */ }
+  }, [items]);
+
+  // 手机冷启动时组件可能先于云拉取挂载、读到空数据。监听云同步事件刷新状态，
+  // 否则随后新增会基于挂载时的空状态把云端已有原材料整体覆盖（表现为“无法添加”）。
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { key?: string } | undefined;
+      if (detail?.key && detail.key !== RAW_MATERIALS_KEY) return;
+      const latest = readRawMaterials();
+      setItems((prev) => (JSON.stringify(prev) === JSON.stringify(latest) ? prev : latest));
+    };
+    window.addEventListener("cloud-storage-sync", handler);
+    window.addEventListener("cloud-storage-local", handler);
+    return () => {
+      window.removeEventListener("cloud-storage-sync", handler);
+      window.removeEventListener("cloud-storage-local", handler);
+    };
+  }, []);
+
   return [items, setItems] as const;
 }
 

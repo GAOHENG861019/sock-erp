@@ -259,8 +259,18 @@ async function pullFromCloud(): Promise<number> {
 
     let merged = 0;
     let uiPrefsChanged = false;
+    const changedKeys: string[] = [];
     const records = (data as CloudRecord[]) || [];
     const meta = getSyncMeta();
+
+    // 拉取写入本地时统一用原始 setItem（不触发本设备的回写/上传），记录被写入的 key
+    const applyCloudRecord = (record: CloudRecord, cloudValue: string) => {
+      originalLocalStorage.setItem(record.storage_key, cloudValue);
+      meta[record.storage_key] = record.updated_at;
+      changedKeys.push(record.storage_key);
+      merged++;
+      if (isUiPreferencesStorageKey(record.storage_key)) uiPrefsChanged = true;
+    };
 
     for (const record of records) {
       // 跳过内部 meta key（兼容旧数据）
@@ -273,19 +283,13 @@ async function pullFromCloud(): Promise<number> {
 
       if (localValue === null) {
         // 本地没有，直接用云端（原样写入，不展开时间戳）
-        originalLocalStorage.setItem(record.storage_key, cloudValue);
-        meta[record.storage_key] = record.updated_at;
-        merged++;
-        if (isUiPreferencesStorageKey(record.storage_key)) uiPrefsChanged = true;
+        applyCloudRecord(record, cloudValue);
       } else if (record.device_id !== deviceId) {
         // 来自其他设备，用独立 meta 中的时间戳比较，不再读取业务数据内的字段
         const localTime = meta[record.storage_key];
         if (!localTime || new Date(record.updated_at) > new Date(localTime)) {
           // 云端更新，原样写入（数组保持数组、对象保持对象）
-          originalLocalStorage.setItem(record.storage_key, cloudValue);
-          meta[record.storage_key] = record.updated_at;
-          merged++;
-          if (isUiPreferencesStorageKey(record.storage_key)) uiPrefsChanged = true;
+          applyCloudRecord(record, cloudValue);
         }
       }
     }
@@ -293,6 +297,12 @@ async function pullFromCloud(): Promise<number> {
     setSyncMeta(meta);
     // 初始化拉取写入了界面偏好时，通知界面刷新（手机端无后端，依赖本地偏好）
     if (uiPrefsChanged) emitUiPreferencesChanged();
+    // 冷启动时组件可能先于云拉取挂载、读到的是空本地数据。这里对每个写入的 key
+    // 派发与实时推送一致的事件，让对应组件把状态更新为云端数据，避免随后新增时
+    // 基于过时的空状态把云端记录整体覆盖。
+    for (const key of changedKeys) {
+      window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key, type: "pull" } }));
+    }
     setStatus("idle");
     return merged;
   } catch (error) {

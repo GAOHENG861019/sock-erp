@@ -86,6 +86,30 @@ describe("云同步合并流程（mock Supabase）", () => {
     expect(meta["sock-erp-fanwa"]).toBe("2026-09-17T11:00:00.000Z");
   });
 
+  it("从云端拉取写入本地后派发 cloud-storage-sync 事件，通知晚挂载的组件刷新", async () => {
+    cloudTable["sock-erp-raw-materials"] = {
+      storage_key: "sock-erp-raw-materials",
+      data: [{ id: "m1", name: "棉纱", amount: 1000 }],
+      updated_at: "2026-09-17T10:00:00.000Z",
+      device_id: "device-other",
+    };
+
+    const events: Array<{ key?: string; type?: string }> = [];
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      if (detail.key === "sock-erp-raw-materials") events.push(detail);
+    };
+    window.addEventListener("cloud-storage-sync", handler);
+
+    const cloudStorage = await freshCloudStorage();
+    await cloudStorage.init();
+    await new Promise((r) => setTimeout(r, 50));
+
+    window.removeEventListener("cloud-storage-sync", handler);
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0].type).toBe("pull");
+  });
+
   it("本地已被旧版污染的数组在初始化时被还原", async () => {
     // 模拟旧版 bug 已经污染了本地数据
     window.localStorage.setItem(

@@ -1797,7 +1797,21 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 /* 校验失败：描边、聚焦环和文字三处同时表达，不只靠颜色 */
 .form-field [aria-invalid="true"] { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 5%, var(--surface-strong)); }
 .form-field [aria-invalid="true"]:focus { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
-.modal-actions { display: flex; justify-content: flex-end; gap: 7px; padding: 16px 22px 20px; }
+/* 底部操作区粘在弹窗底部：内容再高（如手机端长表单），保存按钮也始终可见可点，
+   不会被弹窗滚动或屏幕底部提示条挤出可视区 */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 14px 22px 18px;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--surface-raised);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  backdrop-filter: blur(14px) saturate(120%);
+  border-top: 1px solid var(--border);
+}
 
 .command-search { display: flex; align-items: center; gap: 9px; margin: 16px 20px; padding: 0 13px; height: 44px; border-color: var(--border); border-radius: var(--radius-inset); color: var(--text-faint); background: var(--surface-strong); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .command-search input { flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 13px; }

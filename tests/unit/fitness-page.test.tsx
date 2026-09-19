@@ -79,6 +79,32 @@ describe("原材料采购", () => {
     expect(within(modal).getByText("包数")).toBeInTheDocument();
   });
 
+  it("云端数据晚于组件挂载到达后，新增原材料会保留云端已有数据（不整体覆盖）", () => {
+    // 1) 组件挂载时本地为空（模拟手机冷启动：React 先挂载，云拉取尚未完成）
+    render(<FitnessPage />);
+    expect(screen.getByText("还没有原材料")).toBeInTheDocument();
+
+    // 2) 云拉取完成：原始 setItem 写入云端数据并派发同步事件（测试环境未 patch main.tsx）
+    const cloudItems = [
+      { id: "cloud1", name: "云端棉纱", spec: "21支", weight: 25, packages: 10, unitPrice: 8.4, amount: 2100 },
+    ];
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify(cloudItems));
+    window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key: "sock-erp-raw-materials", type: "pull" } }));
+
+    // 3) 新增一条原材料
+    fireEvent.click(screen.getByText("添加原材料"));
+    const modal = screen.getByRole("dialog");
+    fireEvent.change(within(modal).getByPlaceholderText("例如：棉纱、橡筋"), { target: { value: "新采购橡筋" } });
+    fireEvent.click(within(modal).getByText("保存并继续"));
+
+    // 4) 本地应同时保留云端数据与新增项，而不是只剩新增的一条
+    const stored = JSON.parse(window.localStorage.getItem("sock-erp-raw-materials") || "[]");
+    expect(Array.isArray(stored)).toBe(true);
+    expect(stored).toHaveLength(2);
+    expect(stored.some((i: any) => i.name === "云端棉纱")).toBe(true);
+    expect(stored.some((i: any) => i.name === "新采购橡筋")).toBe(true);
+  });
+
   it("原材料支持编辑修改", () => {
     window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
       { id: "1", name: "棉纱", spec: "32支", weight: 10, unitPrice: 30, amount: 300, packages: 5 },
