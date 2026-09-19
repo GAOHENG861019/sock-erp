@@ -263,11 +263,15 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     await app.register(fastifyStatic, {
       root,
       wildcard: true,
+      // 自定义 Cache-Control 时必须关闭内置 cacheControl，否则 send 会用默认的
+      // max-age=0/immutable 覆盖 setHeaders 里设置的头
+      cacheControl: false,
       setHeaders: (response, filePath) => {
-        response.setHeader(
-          "Cache-Control",
-          filePath.endsWith("index.html") ? "no-cache" : "public, max-age=31536000, immutable",
-        );
+        // Service Worker 与 PWA 清单必须 no-cache：浏览器每次导航都会重新校验 sw.js，
+        // 若按普通静态资源缓存一年，旧版 SW 会一直拦截导航返回旧页面，更新永远到不了用户。
+        // （Workbox 官方规范：sw.js 绝不能使用长缓存）
+        const needsFresh = filePath.endsWith("index.html") || filePath.endsWith("sw.js") || filePath.endsWith("manifest.webmanifest");
+        response.setHeader("Cache-Control", needsFresh ? "no-cache" : "public, max-age=31536000, immutable");
       },
     });
     app.setNotFoundHandler((request, reply) => {
