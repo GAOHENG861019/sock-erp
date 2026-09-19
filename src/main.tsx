@@ -5,9 +5,14 @@ import { App } from "./App";
 import { WorkspaceProvider } from "./WorkspaceContext";
 import { cloudStorage } from "./sync";
 import { notifyAppReady } from "./app-update";
+import { cleanupServiceWorkerInNative } from "./native-sw-cleanup";
 import "./styles.css";
 import "./themes/notebook.css";
 import "./neo.css";
+
+// 原生手机 APP 启动时先注销旧版本残留的 Service Worker，避免它拦截热更新 bundle。
+// 必须在任何渲染与网络请求之前执行。
+cleanupServiceWorkerInNative();
 
 // ===== 全局 patch localStorage，使所有页面自动云同步 =====
 const originalSetItem = localStorage.setItem.bind(localStorage);

@@ -7,12 +7,18 @@ const swState: { offline: boolean; refresh: boolean } = { offline: false, refres
 const setOffline = (v: boolean) => { swState.offline = v; };
 const setRefresh = (v: boolean) => { swState.refresh = v; };
 
+// 记录 useRegisterSW 被调用的次数 —— 原生 APP 中必须为 0（完全不注册 SW）
+const registerCalls = vi.fn();
+
 vi.mock("virtual:pwa-register/react", () => ({
-  useRegisterSW: () => ({
-    offlineReady: [swState.offline, (v: boolean) => { swState.offline = v; }],
-    needRefresh: [swState.refresh, (v: boolean) => { swState.refresh = v; }],
-    updateServiceWorker: vi.fn(async () => {}),
-  }),
+  useRegisterSW: (...args: unknown[]) => {
+    registerCalls(...args);
+    return {
+      offlineReady: [swState.offline, (v: boolean) => { swState.offline = v; }],
+      needRefresh: [swState.refresh, (v: boolean) => { swState.refresh = v; }],
+      updateServiceWorker: vi.fn(async () => {}),
+    };
+  },
 }));
 
 import { PWAUpdateBanner } from "../../src/components/PWAUpdateBanner";
@@ -28,6 +34,7 @@ function setNative(native: boolean) {
 beforeEach(() => {
   swState.offline = false;
   swState.refresh = false;
+  registerCalls.mockClear();
   setNative(false);
   vi.useFakeTimers();
 });
@@ -41,6 +48,11 @@ describe("PWAUpdateBanner", () => {
   it("无任何状态时不渲染", () => {
     const { container } = render(<PWAUpdateBanner />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("浏览器环境会注册 Service Worker（离线能力）", () => {
+    render(<PWAUpdateBanner />);
+    expect(registerCalls).toHaveBeenCalled();
   });
 
   it("浏览器环境离线就绪时显示提示", () => {
@@ -72,10 +84,19 @@ describe("PWAUpdateBanner", () => {
     expect(screen.queryByText("应用已可离线使用")).not.toBeInTheDocument();
   });
 
+  it("原生手机 APP 中完全不注册 Service Worker（否则会拦截热更新返回旧资源）", () => {
+    setNative(true);
+    setOffline(true);
+    setRefresh(true);
+    render(<PWAUpdateBanner />);
+    expect(registerCalls).not.toHaveBeenCalled();
+  });
+
   it("原生手机 APP 中即使发现新版本也不渲染（热更新由 Capgo 负责）", () => {
     setNative(true);
     setRefresh(true);
     const { container } = render(<PWAUpdateBanner />);
     expect(container).toBeEmptyDOMElement();
+    expect(registerCalls).not.toHaveBeenCalled();
   });
 });

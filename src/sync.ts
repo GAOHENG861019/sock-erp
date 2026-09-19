@@ -1,5 +1,14 @@
 import { supabase, SUPABASE_CONFIG } from "./supabase";
 import { emitUiPreferencesChanged, isUiPreferencesStorageKey } from "./ui-preferences";
+import {
+  ENTRIES_META_KEY,
+  emptyEntryMeta,
+  mergeEntriesMeta,
+  mergeItemArrays,
+  computeMetaAfterLocalWrite,
+  isItemArray,
+  type SyncEntriesMeta,
+} from "./sync-merge";
 
 // 保存原始localStorage方法（在任何patch之前捕获）
 const originalLocalStorage = {
@@ -52,6 +61,158 @@ function setSyncMeta(meta: SyncMeta): void {
   } catch {
     /* 存储空间不足等情况忽略 */
   }
+}
+
+// ===== 多设备条目级合并的状态 =====
+/** 各业务 key 的条目元数据（rev / 墓碑），集中存放、独立同步，不污染业务数据 */
+let entriesMeta: SyncEntriesMeta = loadEntriesMeta();
+/** 每个 key 上一次跟踪到的数组快照（JSON），用于检测本地新增/编辑/删除 */
+const itemSnapshots = new Map<string, string>();
+/** 已知为「条目数组」的 key 集合（空数组也能据此识别） */
+const knownItemKeys = new Set<string>();
+/** 条目元数据是否有本地改动待上传 */
+let metaDirty = false;
+let metaUploadTimer: ReturnType<typeof setTimeout> | null = null;
+let pullTimer: ReturnType<typeof setTimeout> | null = null;
+
+function loadEntriesMeta(): SyncEntriesMeta {
+  try {
+    const raw = originalLocalStorage.getItem(ENTRIES_META_KEY);
+    return raw ? (JSON.parse(raw) as SyncEntriesMeta) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveEntriesMetaLocally(): void {
+  try {
+    originalLocalStorage.setItem(ENTRIES_META_KEY, JSON.stringify(entriesMeta));
+  } catch {
+    /* 忽略 */
+  }
+}
+
+function safeParse(raw: string | null): unknown {
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** 判断某份数据是否应作为条目数组处理（结合已知 key 集合兼容空数组） */
+function asItemArray(value: unknown, key: string): Array<Record<string, unknown>> | null {
+  if (isItemArray(value)) return value as Array<Record<string, unknown>>;
+  if (Array.isArray(value) && value.length === 0 && knownItemKeys.has(key)) return [];
+  return null;
+}
+
+/**
+ * 跟踪一次本地写入，更新条目元数据（新增/编辑写 rev，删除写墓碑，恢复写 r）。
+ * 仅在本地业务数据通过 cloudStorage.setItem 写入时调用；云端拉取走 originalLocalStorage，
+ * 不会经过这里，避免把云端数据误判为本地修改。
+ */
+function trackLocalWrite(key: string, value: string): void {
+  if (!shouldSync(key) || key === ENTRIES_META_KEY || key === SYNC_META_KEY) return;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return;
+  }
+  if (!Array.isArray(parsed)) {
+    itemSnapshots.set(key, value);
+    return;
+  }
+
+  knownItemKeys.add(key);
+  const nextItems = parsed as Array<Record<string, unknown>>;
+  const prevRaw = itemSnapshots.get(key) ?? null;
+  const prevParsed = safeParse(prevRaw);
+  const prevItems = isItemArray(prevParsed)
+    ? (prevParsed as Array<Record<string, unknown>>)
+    : Array.isArray(prevParsed) && prevParsed.length === 0
+      ? []
+      : null;
+
+  entriesMeta[key] = computeMetaAfterLocalWrite(prevItems, nextItems, entriesMeta[key], Date.now());
+  saveEntriesMetaLocally();
+  metaDirty = true;
+  scheduleMetaUpload();
+
+  itemSnapshots.set(key, value);
+}
+
+/** 启动时为本地所有条目数组建立快照基线，使首次写入即可正确检测删除 */
+function buildLocalSnapshots(): void {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !shouldSync(key) || key === ENTRIES_META_KEY) continue;
+      if (!itemSnapshots.has(key)) {
+        itemSnapshots.set(key, originalLocalStorage.getItem(key) ?? "null");
+      }
+      const parsed = safeParse(originalLocalStorage.getItem(key));
+      if (isItemArray(parsed)) knownItemKeys.add(key);
+    }
+  } catch {
+    /* 忽略 */
+  }
+}
+
+/** 拉取云端最新条目元数据并两级合并到本地 */
+async function fetchAndMergeCloudMeta(): Promise<SyncEntriesMeta | undefined> {
+  const { data, error } = await supabase
+    .from("app_data")
+    .select("data")
+    .eq("storage_key", ENTRIES_META_KEY)
+    .maybeSingle();
+  if (error) throw error;
+  const cloudMeta = data?.data as SyncEntriesMeta | undefined;
+  if (cloudMeta) {
+    entriesMeta = mergeEntriesMeta(entriesMeta, cloudMeta);
+    saveEntriesMetaLocally();
+  }
+  return cloudMeta;
+}
+
+/** 防抖上传条目元数据（上传前先合并云端，避免覆盖其他设备的元数据） */
+function scheduleMetaUpload(): void {
+  if (!SUPABASE_CONFIG.enabled) return;
+  if (metaUploadTimer) clearTimeout(metaUploadTimer);
+  metaUploadTimer = setTimeout(() => {
+    metaUploadTimer = null;
+    void uploadEntriesMeta();
+  }, DEBOUNCE_MS);
+}
+
+async function uploadEntriesMeta(): Promise<void> {
+  if (!SUPABASE_CONFIG.enabled || !metaDirty) return;
+  try {
+    setStatus("syncing");
+    await fetchAndMergeCloudMeta();
+    const updatedAt = await upsertRow(ENTRIES_META_KEY, entriesMeta);
+    metaDirty = false;
+    const meta = getSyncMeta();
+    meta[ENTRIES_META_KEY] = updatedAt;
+    setSyncMeta(meta);
+    setStatus("idle");
+  } catch (error) {
+    console.error("[CloudSync] 条目元数据上传失败:", error);
+    metaDirty = true; // 保留待重试
+    setStatus("error", (error as Error).message);
+  }
+}
+
+/** 防抖触发一次全量拉取（收到云端 meta 推送后用于最终一致） */
+function schedulePullFromCloud(): void {
+  if (!SUPABASE_CONFIG.enabled) return;
+  if (pullTimer) clearTimeout(pullTimer);
+  pullTimer = setTimeout(() => {
+    pullTimer = null;
+    void pullFromCloud();
+  }, 1200);
 }
 
 /**
@@ -162,6 +323,19 @@ function shouldSync(key: string): boolean {
   );
 }
 
+/** 直接 upsert 一行（含时间戳），返回写入时间 */
+async function upsertRow(key: string, data: unknown): Promise<string> {
+  const updatedAt = new Date().toISOString();
+  const { error } = await supabase
+    .from("app_data")
+    .upsert(
+      { storage_key: key, data, device_id: deviceId, updated_at: updatedAt },
+      { onConflict: "storage_key" },
+    );
+  if (error) throw error;
+  return updatedAt;
+}
+
 /** 防抖写入云端 */
 function queueCloudWrite(key: string, value: string) {
   if (!SUPABASE_CONFIG.enabled) return;
@@ -192,7 +366,7 @@ function queueCloudDelete(key: string) {
   }, DEBOUNCE_MS);
 }
 
-/** 写入云端（upsert） */
+/** 写入云端：条目数组做「读云端→合并→写回」，对象类直接 LWW */
 async function upsertToCloud(key: string, value: string) {
   try {
     setStatus("syncing");
@@ -203,21 +377,63 @@ async function upsertToCloud(key: string, value: string) {
       parsed = value;
     }
 
-    const updatedAt = new Date().toISOString();
-    const { error } = await supabase
-      .from("app_data")
-      .upsert(
-        {
-          storage_key: key,
-          data: parsed,
-          device_id: deviceId,
-          updated_at: updatedAt,
-        },
-        { onConflict: "storage_key" },
-      );
+    const isItems = isItemArray(parsed) || (Array.isArray(parsed) && knownItemKeys.has(key));
 
-    if (error) throw error;
-    // 时间戳单独存到 meta，不污染业务数据（尤其数组）
+    if (isItems) {
+      // 多设备并发安全：先读云端业务行 + 全局条目元数据，做条目级并集后再写回
+      const [bizRes, metaRes] = await Promise.all([
+        supabase
+          .from("app_data")
+          .select("data,updated_at,device_id")
+          .eq("storage_key", key)
+          .maybeSingle(),
+        supabase
+          .from("app_data")
+          .select("data")
+          .eq("storage_key", ENTRIES_META_KEY)
+          .maybeSingle(),
+      ]);
+      if (bizRes.error) throw bizRes.error;
+      if (metaRes.error) throw metaRes.error;
+
+      const cloudMetaGlobal = metaRes.data?.data as SyncEntriesMeta | undefined;
+      if (cloudMetaGlobal) {
+        entriesMeta = mergeEntriesMeta(entriesMeta, cloudMetaGlobal);
+      }
+      const cloudParsed = repairPollutedArray(bizRes.data?.data);
+      const cloudArr = Array.isArray(cloudParsed)
+        ? (cloudParsed as Array<Record<string, unknown>>)
+        : [];
+      const localArr = Array.isArray(parsed) ? (parsed as Array<Record<string, unknown>>) : [];
+      const mergedArr = mergeItemArrays(localArr, cloudArr, entriesMeta[key], cloudMetaGlobal?.[key]);
+      entriesMeta[key] = mergeEntriesMeta(
+        { __k: entriesMeta[key] ?? emptyEntryMeta() },
+        { __k: cloudMetaGlobal?.[key] ?? emptyEntryMeta() },
+      ).__k;
+      saveEntriesMetaLocally();
+
+      const mergedValue = JSON.stringify(mergedArr);
+      if (mergedValue !== value) {
+        // 云端有本地缺失的条目（其他设备新增），合并回本地并通知 UI 刷新
+        originalLocalStorage.setItem(key, mergedValue);
+        itemSnapshots.set(key, mergedValue);
+        window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key, type: "merge" } }));
+      }
+
+      const bizUpdatedAt = await upsertRow(key, mergedArr);
+      await upsertRow(ENTRIES_META_KEY, entriesMeta);
+      metaDirty = false;
+
+      const meta = getSyncMeta();
+      meta[key] = bizUpdatedAt;
+      meta[ENTRIES_META_KEY] = bizUpdatedAt;
+      setSyncMeta(meta);
+      setStatus("idle");
+      return;
+    }
+
+    // 对象类：整份 last-write-wins
+    const updatedAt = await upsertRow(key, parsed);
     const meta = getSyncMeta();
     meta[key] = updatedAt;
     setSyncMeta(meta);
@@ -263,6 +479,13 @@ async function pullFromCloud(): Promise<number> {
     const records = (data as CloudRecord[]) || [];
     const meta = getSyncMeta();
 
+    // 1) 先取出云端条目元数据并两级合并，供后续条目级合并使用
+    const cloudEntriesMetaRecord = records.find((r) => r.storage_key === ENTRIES_META_KEY);
+    if (cloudEntriesMetaRecord?.data) {
+      entriesMeta = mergeEntriesMeta(entriesMeta, cloudEntriesMetaRecord.data as SyncEntriesMeta);
+      saveEntriesMetaLocally();
+    }
+
     // 拉取写入本地时统一用原始 setItem（不触发本设备的回写/上传），记录被写入的 key
     const applyCloudRecord = (record: CloudRecord, cloudValue: string) => {
       originalLocalStorage.setItem(record.storage_key, cloudValue);
@@ -273,35 +496,65 @@ async function pullFromCloud(): Promise<number> {
     };
 
     for (const record of records) {
-      // 跳过内部 meta key（兼容旧数据）
-      if (record.storage_key === SYNC_META_KEY) continue;
+      // 跳过内部 meta key
+      if (record.storage_key === SYNC_META_KEY || record.storage_key === ENTRIES_META_KEY) continue;
 
       // 云端数据先修复历史污染（数组被展开成对象的情况）
       const cloudData = repairPollutedArray(record.data);
-      const cloudValue = JSON.stringify(cloudData);
-      const localValue = originalLocalStorage.getItem(record.storage_key);
+      const key = record.storage_key;
+      const localRaw = originalLocalStorage.getItem(key);
+      const localParsed = safeParse(localRaw);
 
-      if (localValue === null) {
-        // 本地没有，直接用云端（原样写入，不展开时间戳）
-        applyCloudRecord(record, cloudValue);
+      const cloudItems = asItemArray(cloudData, key);
+      const localItems = asItemArray(localParsed, key);
+
+      // 2) 条目数组：按 id 并集合并 + 墓碑删除，多设备各自新增/删除互不覆盖
+      if (cloudItems !== null || (localItems !== null && Array.isArray(cloudData))) {
+        knownItemKeys.add(key);
+        const cloudArr = Array.isArray(cloudData) ? (cloudData as Array<Record<string, unknown>>) : [];
+        const localArr = Array.isArray(localParsed) ? (localParsed as Array<Record<string, unknown>>) : [];
+        const cloudMetaForKey = (cloudEntriesMetaRecord?.data as SyncEntriesMeta | undefined)?.[key];
+        const mergedArr = mergeItemArrays(localArr, cloudArr, entriesMeta[key], cloudMetaForKey);
+        if (cloudMetaForKey) {
+          entriesMeta[key] = mergeEntriesMeta(
+            { __k: entriesMeta[key] ?? emptyEntryMeta() },
+            { __k: cloudMetaForKey },
+          ).__k;
+        } else if (!entriesMeta[key]) {
+          entriesMeta[key] = emptyEntryMeta();
+        }
+        saveEntriesMetaLocally();
+        const mergedValue = JSON.stringify(mergedArr);
+        itemSnapshots.set(key, mergedValue);
+        if (localRaw !== mergedValue) {
+          originalLocalStorage.setItem(key, mergedValue);
+          meta[key] = record.updated_at;
+          changedKeys.push(key);
+          merged++;
+          if (isUiPreferencesStorageKey(key)) uiPrefsChanged = true;
+        }
+        continue;
+      }
+
+      // 3) 非条目（对象类）数据：保持整份 last-write-wins
+      if (localRaw === null) {
+        // 本地没有，直接用云端
+        applyCloudRecord(record, JSON.stringify(cloudData));
       } else if (record.device_id !== deviceId) {
-        // 来自其他设备，用独立 meta 中的时间戳比较，不再读取业务数据内的字段
-        const localTime = meta[record.storage_key];
+        // 来自其他设备，用独立 meta 中的时间戳比较
+        const localTime = meta[key];
         if (!localTime || new Date(record.updated_at) > new Date(localTime)) {
-          // 云端更新，原样写入（数组保持数组、对象保持对象）
-          applyCloudRecord(record, cloudValue);
+          applyCloudRecord(record, JSON.stringify(cloudData));
         }
       }
     }
 
     setSyncMeta(meta);
-    // 初始化拉取写入了界面偏好时，通知界面刷新（手机端无后端，依赖本地偏好）
     if (uiPrefsChanged) emitUiPreferencesChanged();
-    // 冷启动时组件可能先于云拉取挂载、读到的是空本地数据。这里对每个写入的 key
-    // 派发与实时推送一致的事件，让对应组件把状态更新为云端数据，避免随后新增时
-    // 基于过时的空状态把云端记录整体覆盖。
-    for (const key of changedKeys) {
-      window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key, type: "pull" } }));
+    // 冷启动时组件可能先于云拉取挂载、读到空数据。对每个写入的 key 派发事件，
+    // 让对应组件把状态更新为云端数据，避免随后新增时基于过时空状态覆盖云端记录。
+    for (const changedKey of changedKeys) {
+      window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key: changedKey, type: "pull" } }));
     }
     setStatus("idle");
     return merged;
@@ -331,19 +584,51 @@ function subscribeRealtime() {
 
         if (payload.eventType === "DELETE" && oldRecord) {
           originalLocalStorage.removeItem(oldRecord.storage_key);
+          itemSnapshots.delete(oldRecord.storage_key);
+          knownItemKeys.delete(oldRecord.storage_key);
           const meta = getSyncMeta();
           delete meta[oldRecord.storage_key];
           setSyncMeta(meta);
           window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key, type: "delete" } }));
-        } else if (record) {
-          // 实时推送同样修复污染，并原样写入，不展开时间戳
-          const fixed = repairPollutedArray(record.data);
-          originalLocalStorage.setItem(key, JSON.stringify(fixed));
+          return;
+        }
+
+        if (!record) return;
+        const fixed = repairPollutedArray(record.data);
+
+        // 条目元数据行：两级合并后触发一次全量拉取做最终一致
+        if (key === ENTRIES_META_KEY) {
+          entriesMeta = mergeEntriesMeta(entriesMeta, fixed as SyncEntriesMeta);
+          saveEntriesMetaLocally();
+          schedulePullFromCloud();
+          window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key, type: "update" } }));
+          return;
+        }
+
+        // 条目数组：按 id 合并（云端 meta 以当前已合并的 meta 近似，meta 行到达后会再全量纠正）
+        const cloudItems = asItemArray(fixed, key);
+        const localParsed = safeParse(originalLocalStorage.getItem(key));
+        if (cloudItems !== null || (isItemArray(localParsed) && Array.isArray(fixed))) {
+          knownItemKeys.add(key);
+          const cloudArr = Array.isArray(fixed) ? (fixed as Array<Record<string, unknown>>) : [];
+          const localArr = Array.isArray(localParsed) ? (localParsed as Array<Record<string, unknown>>) : [];
+          const mergedArr = mergeItemArrays(localArr, cloudArr, entriesMeta[key], entriesMeta[key]);
+          const mergedValue = JSON.stringify(mergedArr);
+          originalLocalStorage.setItem(key, mergedValue);
+          itemSnapshots.set(key, mergedValue);
           const meta = getSyncMeta();
           meta[key] = record.updated_at;
           setSyncMeta(meta);
           window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key, type: "update" } }));
+          return;
         }
+
+        // 对象类：整份写入
+        originalLocalStorage.setItem(key, JSON.stringify(fixed));
+        const meta = getSyncMeta();
+        meta[key] = record.updated_at;
+        setSyncMeta(meta);
+        window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key, type: "update" } }));
       },
     )
     .subscribe();
@@ -357,6 +642,7 @@ export const cloudStorage = {
 
   setItem(key: string, value: string): void {
     originalLocalStorage.setItem(key, value);
+    trackLocalWrite(key, value);
     queueCloudWrite(key, value);
     // 通知同页面其他组件
     window.dispatchEvent(new CustomEvent("cloud-storage-local", { detail: { key } }));
@@ -364,6 +650,8 @@ export const cloudStorage = {
 
   removeItem(key: string): void {
     originalLocalStorage.removeItem(key);
+    itemSnapshots.delete(key);
+    knownItemKeys.delete(key);
     queueCloudDelete(key);
     window.dispatchEvent(new CustomEvent("cloud-storage-local", { detail: { key } }));
   },
@@ -379,6 +667,9 @@ export const cloudStorage = {
       console.warn(`[CloudSync] 已修复 ${repaired} 个被污染的本地数据`);
     }
 
+    // 建立本地条目快照基线，保证首次写入即可正确检测删除
+    buildLocalSnapshots();
+
     if (!SUPABASE_CONFIG.enabled) {
       setStatus("idle");
       return { merged: 0 };
@@ -393,24 +684,31 @@ export const cloudStorage = {
     window.addEventListener("online", () => {
       setStatus("syncing");
       // 重新同步所有待写入项
-      for (const [key, { value }] of pendingWrites) {
-        void upsertToCloud(key, value);
+      for (const [writeKey] of pendingWrites) {
+        const latest = originalLocalStorage.getItem(writeKey);
+        if (latest !== null) void upsertToCloud(writeKey, latest);
       }
+      void uploadEntriesMeta();
       void pullFromCloud();
     });
 
     return { merged };
   },
 
-  /** 强制全量同步 */
+  /** 强制全量同步：先拉取合并，再把本地最新值写回，最后再拉取一次收敛 */
   async forceSync(): Promise<void> {
-    // 先flush所有待写入
-    for (const [key, { value, timer }] of pendingWrites) {
+    // 1) 先把云端最新合并进本地
+    await pullFromCloud();
+    // 2) flush 待写入（用本地最新值，内部会再读云端合并，杜绝覆盖）
+    for (const [key, { timer }] of pendingWrites) {
       clearTimeout(timer);
       pendingWrites.delete(key);
-      await upsertToCloud(key, value);
+      const latest = originalLocalStorage.getItem(key);
+      if (latest !== null) await upsertToCloud(key, latest);
     }
-    // 再拉取
+    // 3) 上传条目元数据
+    if (metaDirty) await uploadEntriesMeta();
+    // 4) 再拉取一次，收敛到最终一致
     await pullFromCloud();
   },
 

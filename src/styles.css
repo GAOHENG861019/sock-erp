@@ -2725,3 +2725,26 @@ input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px;
 }
 .baidu-stats { font-size: 12px; color: var(--text-muted); }
 
+
+/* 下拉刷新（手机端触摸手势） */
+.pull-to-refresh {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  pointer-events: none;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface-strong, #ffffff) 88%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--text-soft, #666666);
+  font-size: 13px;
+}
+.pull-to-refresh-icon { display: inline-flex; transition: transform .18s ease; }
+.pull-to-refresh-text { line-height: 1; }
+.ptr-spinning { animation: ptr-spin .8s linear infinite; }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }

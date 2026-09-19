@@ -5,10 +5,18 @@ import { isNativeApp } from "../plugins/AppUpdate";
 // 离线就绪提示自动停留时长（毫秒），到点自动消失，避免长期遮挡弹窗底部按钮
 const OFFLINE_HINT_MS = 3000;
 
-export function PWAUpdateBanner() {
+/**
+ * 浏览器环境的 Service Worker 横幅。
+ *
+ * 关键：useRegisterSW 这个 Hook 一旦被调用就会注册 Service Worker。
+ * Capacitor 原生手机 APP 绝不能注册 SW —— workbox 的 navigateFallback 会把
+ * index.html 缓存住，Capgo 热更新切换到新 bundle 后，旧 SW 仍拦截导航返回旧资源，
+ * 导致热更新永远不生效。因此本组件只在浏览器环境挂载，原生环境在外层直接 return null，
+ * 连 Hook 都不会执行。
+ */
+function BrowserSWBanner() {
   const [needRefresh, setNeedRefresh] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
-  const native = isNativeApp();
 
   const {
     offlineReady: [offline, setOfflineReadyState],
@@ -40,10 +48,6 @@ export function PWAUpdateBanner() {
     const timer = window.setTimeout(() => setOfflineReady(false), OFFLINE_HINT_MS);
     return () => window.clearTimeout(timer);
   }, [offlineReady]);
-
-  // 原生手机 APP（Capacitor）资源已内置在本地、天然离线，更新由 Capgo 热更新负责，
-  // 不显示 PWA 离线/更新提示（它会固定在屏幕底部遮挡弹窗的保存按钮）。
-  if (native) return null;
 
   if (!needRefresh && !offlineReady) return null;
 
@@ -104,4 +108,11 @@ export function PWAUpdateBanner() {
       </button>
     </div>
   );
+}
+
+export function PWAUpdateBanner() {
+  // 原生手机 APP（Capacitor）资源已内置在本地、天然离线，更新由 Capgo 热更新负责。
+  // 这里提前返回，不挂载 BrowserSWBanner，从而保证 useRegisterSW 完全不执行、不注册 SW。
+  if (isNativeApp()) return null;
+  return <BrowserSWBanner />;
 }

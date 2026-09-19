@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -15,6 +15,8 @@ import { AmbientEnvironment, chooseAmbientScene } from "./AmbientEnvironment";
 import { ModuleArtwork, type ModuleArtworkName } from "./ModuleArtwork";
 import type { Entity } from "../types";
 import { AppUpdate, isNativeApp } from "../plugins/AppUpdate";
+import { setupNativeBackButton } from "../native-back";
+import { PullToRefresh } from "./PullToRefresh";
 
 const groups = [
   { label: "总览", links: [
@@ -87,6 +89,7 @@ export function AppLayout() {
   const { data, saveNow, saveStatus } = useWorkspace();
   const syncStatus = useSyncStatus();
   const location = useLocation();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -132,9 +135,14 @@ export function AppLayout() {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // 安卓返回键：先关弹层/抽屉，再返回上一页，首页双击退出。仅原生 APP 生效。
+  const locationRef = useRef(location);
+  locationRef.current = location;
+  useEffect(() => setupNativeBackButton(() => locationRef.current, navigate), [navigate]);
+
   // 启动时自动检测更新
   useEffect(() => {
-    const currentVersion = "1.2.0";
+    const currentVersion = "1.4.0";
     const dismissed = localStorage.getItem("sock-erp-update-dismissed");
     if (dismissed === currentVersion) return;
     (async () => {
@@ -236,6 +244,7 @@ export function AppLayout() {
       data-ambient={ambientScene}
     >
       {appearance === "liquid" ? <AmbientEnvironment scene={ambientScene} /> : appearance === "notebook" ? <NotebookEnvironment /> : null}
+      <PullToRefresh />
       <a className="skip-link" href="#main-content">跳到主要内容</a>
       {mobileMenuOpen ? <div className="mobile-overlay" onClick={() => setMobileMenuOpen(false)} /> : null}
       <aside className="sidebar glass-regular">

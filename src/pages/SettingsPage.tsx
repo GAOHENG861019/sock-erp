@@ -23,7 +23,7 @@ export function SettingsPage() {
   const [baiduPath, setBaiduPath] = useState("");
   const [baiduSyncing, setBaiduSyncing] = useState(false);
   const [baiduMsg, setBaiduMsg] = useState("");
-  const [appVersion] = useState("1.3.0");
+  const [appVersion] = useState("1.4.0");
   const [busy, setBusy] = useState("");
   const [restoreId, setRestoreId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);

@@ -11,7 +11,7 @@
  *
  * 用法：node scripts/build-desktop.mjs
  */
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,9 +22,12 @@ const PORTABLE_NODE = path.join(projectRoot, "runtime", "node.exe");
 
 function run(cmd, args, opts = {}) {
   console.log(`\n$ ${cmd} ${args.join(" ")}  (cwd: ${opts.cwd ?? projectRoot})`);
-  execSync(cmd === "npm" && process.platform === "win32" ? "npm.cmd" : cmd, args, {
+  const command = cmd === "npm" && process.platform === "win32" ? "npm.cmd" : cmd;
+  // Windows 上 .cmd（npm.cmd / npx.cmd）需要 shell 才能解析
+  execFileSync(command, args, {
     cwd: opts.cwd ?? projectRoot,
     stdio: "inherit",
+    shell: process.platform === "win32",
     env: {
       ...process.env,
       ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/",
@@ -120,11 +123,13 @@ fs.writeFileSync(
   JSON.stringify(shellPkg, null, 2) + "\n",
 );
 
-// 5. electron-builder 打包
-console.log("\n=== 5/5 electron-builder 打包 portable exe ===");
-run("npx", ["electron-builder", "--win", "portable", "--config", "electron-builder.yml"]);
+// 5. electron-builder 打包（配置在 electron-shell 目录，target 以 yml 中的 nsis 为准）
+console.log("\n=== 5/5 electron-builder 打包 Windows 安装包 ===");
+const shellDir = path.join(projectRoot, "electron-shell");
+const builderCli = path.join(projectRoot, "node_modules", "electron-builder", "out", "cli", "cli.js");
+run(process.execPath, [builderCli, "--win", "--config", "electron-builder.yml"], { cwd: shellDir });
 
-const artifact = path.join(projectRoot, "release", "袜厂进销存ERP-电脑版.exe");
+const artifact = path.join(projectRoot, "release", `SockERP-Desktop-Setup-${pkg.version}.exe`);
 if (fs.existsSync(artifact)) {
   const sizeMB = (fs.statSync(artifact).size / 1024 / 1024).toFixed(1);
   console.log(`\n[完成] 电脑版已生成：${artifact}（${sizeMB} MB）`);

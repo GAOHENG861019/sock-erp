@@ -35,4 +35,4 @@ compression: maximum
 asar: true
 npmRebuild: false
 electronVersion: 31.7.7
-afterPack: electron-shell/after-pack.cjs
+afterPack: after-pack.cjs
