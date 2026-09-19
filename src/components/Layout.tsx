@@ -53,6 +53,33 @@ const groups = [
   { label: "系统", links: [{ to: "/settings", label: "数据与设置", module: "settings", tone: "graphite" }] },
 ] satisfies Array<{ label: string; links: Array<{ to: string; label: string; module: ModuleArtworkName; tone: string }> }>;
 
+const ALL_MENU_ROUTES = groups.flatMap((g) => g.links.map((l) => l.to));
+
+/**
+ * 解析侧边栏可见菜单。
+ * 仅接受「全部为已知合法路由」的数组；遇到字符串（历史云同步污染）、
+ * 非法值或过滤后为空时，回退为展示全部功能，避免菜单只剩首页。
+ */
+function resolveVisibleMenuItems(): string[] {
+  try {
+    const raw = localStorage.getItem("sock-erp-visible-menu");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const valid = parsed.filter(
+          (x): x is string => typeof x === "string" && ALL_MENU_ROUTES.includes(x),
+        );
+        // 完整菜单返回常量引用，避免每次解析产生新数组引用触发重渲染
+        if (valid.length === ALL_MENU_ROUTES.length) return ALL_MENU_ROUTES;
+        if (valid.length > 0) return valid;
+      }
+    }
+  } catch {
+    /* 损坏数据：回退全部 */
+  }
+  return ALL_MENU_ROUTES;
+}
+
 const collectionRoutes: Record<string, string> = {
   planItems: "/today", mediaContents: "/media", devProjects: "/development", devMilestones: "/development",
   devWorkItems: "/development", devLogs: "/development", clients: "/customer", consultingProjects: "/customer",
@@ -97,16 +124,25 @@ export function AppLayout() {
   const [exitState, setExitState] = useState<"idle" | "saving" | "done" | "error">("idle");
   const [updateInfo, setUpdateInfo] = useState<{ version: string; apkUrl: string; downloadUrl: string; changes: string[] } | null>(null);
   const [updateDismissed, setUpdateDismissed] = useState(false);
-  const [visibleMenuItems, setVisibleMenuItems] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem("sock-erp-visible-menu");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch { /* ignore */ }
-    return groups.flatMap((g) => g.links.map((l) => l.to));
-  });
+  const [visibleMenuItems, setVisibleMenuItems] = useState<string[]>(resolveVisibleMenuItems);
+
+  // 云同步（冷启动拉取/多设备变更）更新菜单配置后，侧边栏随之刷新。
+  // 只监听云端事件：本地写入会派发 cloud-storage-local，监听它会与下方持久化
+  // effect 形成「写入→事件→setState→再写入」的无限循环，故不监听。
+  useEffect(() => {
+    const reload = (e: Event) => {
+      const key = (e as CustomEvent)?.detail?.key;
+      if (key && key !== "sock-erp-visible-menu") return;
+      setVisibleMenuItems((prev) => {
+        const next = resolveVisibleMenuItems();
+        // 内容一致则保持原引用，避免无谓重渲染/再次持久化
+        if (prev.length === next.length && prev.every((x, i) => x === next[i])) return prev;
+        return next;
+      });
+    };
+    window.addEventListener("cloud-storage-sync", reload);
+    return () => window.removeEventListener("cloud-storage-sync", reload);
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem("sock-erp-visible-menu", JSON.stringify(visibleMenuItems)); } catch { /* ignore */ }

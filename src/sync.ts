@@ -121,13 +121,17 @@ function trackLocalWrite(key: string, value: string): void {
   } catch {
     return;
   }
-  if (!Array.isArray(parsed)) {
+  const items = asItemArray(parsed, key);
+  if (!items) {
+    // 非条目数组（普通对象、字符串/数字数组配置，如菜单可见性、快速新增）：
+    // 仅记录快照、走整份 LWW。字符串路径没有 id，若误走条目合并会被全部算成
+    // 同一个 id "undefined" 而互相覆盖，导致菜单越同步越少。
     itemSnapshots.set(key, value);
     return;
   }
 
   knownItemKeys.add(key);
-  const nextItems = parsed as Array<Record<string, unknown>>;
+  const nextItems = items;
   const prevRaw = itemSnapshots.get(key) ?? null;
   const prevParsed = safeParse(prevRaw);
   const prevItems = isItemArray(prevParsed)
@@ -377,9 +381,9 @@ async function upsertToCloud(key: string, value: string) {
       parsed = value;
     }
 
-    const isItems = isItemArray(parsed) || (Array.isArray(parsed) && knownItemKeys.has(key));
+    const items = asItemArray(parsed, key);
 
-    if (isItems) {
+    if (items) {
       // 多设备并发安全：先读云端业务行 + 全局条目元数据，做条目级并集后再写回
       const [bizRes, metaRes] = await Promise.all([
         supabase
@@ -404,7 +408,7 @@ async function upsertToCloud(key: string, value: string) {
       const cloudArr = Array.isArray(cloudParsed)
         ? (cloudParsed as Array<Record<string, unknown>>)
         : [];
-      const localArr = Array.isArray(parsed) ? (parsed as Array<Record<string, unknown>>) : [];
+      const localArr = items;
       const mergedArr = mergeItemArrays(localArr, cloudArr, entriesMeta[key], cloudMetaGlobal?.[key]);
       entriesMeta[key] = mergeEntriesMeta(
         { __k: entriesMeta[key] ?? emptyEntryMeta() },
