@@ -23,11 +23,13 @@ const PORTABLE_NODE = path.join(projectRoot, "runtime", "node.exe");
 function run(cmd, args, opts = {}) {
   console.log(`\n$ ${cmd} ${args.join(" ")}  (cwd: ${opts.cwd ?? projectRoot})`);
   const command = cmd === "npm" && process.platform === "win32" ? "npm.cmd" : cmd;
-  // Windows 上 .cmd（npm.cmd / npx.cmd）需要 shell 才能解析
+  // 仅 .cmd / .bat 包装器需要 shell 解析；node.exe 等可执行文件直接 exec，
+  // 否则含空格的路径（如沙箱 node.exe）会被 shell 截断
+  const needsShell = opts.shell ?? (command.endsWith(".cmd") || command.endsWith(".bat"));
   execFileSync(command, args, {
     cwd: opts.cwd ?? projectRoot,
     stdio: "inherit",
-    shell: process.platform === "win32",
+    shell: needsShell,
     env: {
       ...process.env,
       ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/",
