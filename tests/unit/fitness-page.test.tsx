@@ -175,4 +175,30 @@ describe("原材料采购", () => {
     });
     expect(result.current[0].map((i) => i.id)).not.toContain("gone");
   });
+
+  it("名称为空时点击保存给出“请填写名称”提示且不添加（不再静默无反应）", () => {
+    render(<FitnessPage />);
+    fireEvent.click(screen.getByText("添加原材料"));
+    const modal = screen.getByRole("dialog");
+    // 不填名称，直接点保存
+    fireEvent.click(within(modal).getByText("保存并继续"));
+    expect(within(modal).getByText("请填写名称")).toBeInTheDocument();
+    const stored = JSON.parse(window.localStorage.getItem("sock-erp-raw-materials") || "[]");
+    expect(stored).toHaveLength(0);
+  });
+
+  it("手机输入法下受控名称未同步但输入框有值时，兜底读取并保存", () => {
+    render(<FitnessPage />);
+    fireEvent.click(screen.getByText("添加原材料"));
+    const modal = screen.getByRole("dialog");
+    const nameInput = within(modal).getByPlaceholderText("例如：棉纱、橡筋") as HTMLInputElement;
+    // 模拟手机中文 IME / captureInput：直接改 DOM 值但不派发 input 事件，
+    // 此时 React 受控 state 仍为空，输入框 DOM 却有值。
+    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
+    nativeSetter.call(nameInput, "棉纱IME");
+    // 不触发 input/change，React state 保持空
+    fireEvent.click(within(modal).getByText("保存并继续"));
+    const stored = JSON.parse(window.localStorage.getItem("sock-erp-raw-materials") || "[]");
+    expect(stored.some((i: any) => i.name === "棉纱IME")).toBe(true);
+  });
 });

@@ -10,6 +10,7 @@ import { ModuleArtwork } from "../components/ModuleArtwork";
 import { AppUpdateSection } from "../components/AppUpdateSection";
 import { normalizeAppearance } from "../appearance";
 import { isNativeApp } from "../plugins/AppUpdate";
+import { APP_VERSION } from "../version";
 import * as XLSX from "xlsx";
 
 const collectionLabels: Record<string, string> = { planItems: "本月总览", quickMemos: "快速备忘", mediaContents: "工作进度", devProjects: "商品项目", devMilestones: "商品分类", devWorkItems: "商品明细", devLogs: "操作日志", clients: "客户", consultingProjects: "仓库项目", consultingInteractions: "出入库记录", consultingDeliverables: "出库单", consultingFollowups: "库存跟进", consultingTimeEntries: "盘点时长", workoutTemplates: "采购模板", workoutTemplateExercises: "模板物料", workouts: "采购记录", workoutExercises: "采购明细", workoutSets: "采购批次", bodyMetrics: "供应商数据", nutritionTargets: "库存目标", foods: "常用物料", meals: "盘点单", mealItems: "盘点明细", entertainmentItems: "采购单", playSessions: "采购执行记录" };
@@ -23,7 +24,7 @@ export function SettingsPage() {
   const [baiduPath, setBaiduPath] = useState("");
   const [baiduSyncing, setBaiduSyncing] = useState(false);
   const [baiduMsg, setBaiduMsg] = useState("");
-  const [appVersion] = useState("1.4.2");
+  const appVersion = APP_VERSION;
   const [busy, setBusy] = useState("");
   const [restoreId, setRestoreId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);

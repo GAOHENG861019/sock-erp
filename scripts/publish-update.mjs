@@ -20,6 +20,7 @@ import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
+import { applyNativeServiceWorker } from "./lib/native-bundle.mjs";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const distDir = path.join(projectRoot, "dist");
@@ -148,6 +149,17 @@ async function main() {
   console.log("打包 dist 为 zip…");
   const zip = new JSZip();
   await addDirToZip(zip, distDir);
+
+  // 原生 APP 热更新必须用「自毁 SW」替换 workbox sw.js，否则旧 SW 拦截导航、缓存旧代码，
+  // 导致热更新后 webview 仍跑旧版本（原材料添加等修复到不了手机）。
+  const swResult = applyNativeServiceWorker(zip, projectRoot);
+  if (!swResult.killSwFound) {
+    console.warn("警告：未找到 scripts/native-kill-sw.js，bundle 仍会包含 workbox SW");
+  } else {
+    console.log("已用自毁 SW 覆盖 bundle 内 sw.js");
+  }
+  for (const removed of swResult.removed) console.log(`已从 bundle 移除 ${removed}`);
+
   const zipBuffer = await zip.generateAsync({
     type: "nodebuffer",
     compression: "DEFLATE",

@@ -109,8 +109,9 @@ export function FitnessPage() {
 
 function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null; onClose: () => void; onSave: (item: RawMaterial) => void }) {
   const [form, setForm] = useState<RawMaterial>({ id: "", name: "", spec: "", weight: 0, unitPrice: 0, amount: 0, packages: 0 });
+  const [nameError, setNameError] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (open) setForm(open); }, [open]);
+  useEffect(() => { if (open) { setForm(open); setNameError(""); } }, [open]);
   if (!open) return null;
   const isEditing = !!form.id;
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,8 +124,20 @@ function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null
   const calcAmount = (packages: number, weight: number, unitPrice: number) => Number((packages * weight * unitPrice).toFixed(2));
   const totalWeight = Number(form.packages || 0) * Number(form.weight || 0);
   const handleSave = () => {
-    if (!form.name.trim()) return;
-    onSave(form);
+    // 手机中文输入法 / captureInput 下受控值可能在提交瞬间未及时同步，兜底从输入框读取一次
+    let name = form.name;
+    if (!name.trim() && nameInputRef.current) {
+      name = nameInputRef.current.value || "";
+    }
+    name = name.trim();
+    if (!name) {
+      // 不再静默返回，明确提示，避免用户点了“保存并继续”却没有任何反馈
+      setNameError("请填写名称");
+      nameInputRef.current?.focus();
+      return;
+    }
+    onSave({ ...form, name });
+    setNameError("");
     if (isEditing) {
       onClose();
     } else {
@@ -135,7 +148,7 @@ function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null
   return (
     <Modal open title={isEditing ? "编辑原材料" : "添加原材料"} description="填写名称、规格、包数、单重(公斤/包)和单价(元/公斤)，总重量=包数×单重，金额=包数×单重×单价。添加后可连续录入下一条。" onClose={onClose}>
       <div className="form-grid">
-        <label className="form-field"><span>名称<em>必填</em></span><input ref={nameInputRef} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="例如：棉纱、橡筋" /></label>
+        <label className="form-field"><span>名称<em>必填</em></span><input ref={nameInputRef} value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); if (nameError) setNameError(""); }} placeholder="例如：棉纱、橡筋" />{nameError ? <small style={{ color: "#e74c3c" }}>{nameError}</small> : null}</label>
         <label className="form-field"><span>规格</span><input value={form.spec} onChange={(e) => setForm({ ...form, spec: e.target.value })} placeholder="例如：32支、40支" /></label>
         <label className="form-field"><span>采购人</span><input value={form.payer || ""} onChange={(e) => setForm({ ...form, payer: e.target.value })} placeholder="谁采购的" /></label>
         <label className="form-field"><span>包数</span><input type="number" step="1" min="0" value={form.packages || ""} onChange={(e) => { const p = Number(e.target.value) || 0; setForm({ ...form, packages: p, amount: calcAmount(p, form.weight, form.unitPrice) }); }} placeholder="包" /></label>

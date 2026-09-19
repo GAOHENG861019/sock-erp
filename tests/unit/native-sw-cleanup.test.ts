@@ -1,12 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // 安装/卸载假的 serviceWorker 与 caches API
-function installBrowserApis() {
-  const unregister = vi.fn(async () => true);
-  const getRegistrations = vi.fn(async () => [{ unregister }]);
+function installBrowserApis(options: { controlled?: boolean; registrations?: number } = {}) {
+  const regs = Array.from({ length: options.registrations ?? 1 }, () => ({
+    unregister: vi.fn(async () => true),
+  }));
+  const unregister = regs[0]?.unregister ?? vi.fn(async () => true);
+  const getRegistrations = vi.fn(async () => regs);
   Object.defineProperty(navigator, "serviceWorker", {
     configurable: true,
-    value: { getRegistrations },
+    value: {
+      getRegistrations,
+      controller: options.controlled ? { scriptURL: "/sw.js" } : null,
+    },
   });
 
   const deleteCache = vi.fn(async () => true);
@@ -16,7 +22,7 @@ function installBrowserApis() {
     value: { keys: cacheKeys, delete: deleteCache },
   });
 
-  return { unregister, getRegistrations, deleteCache, cacheKeys };
+  return { unregister, getRegistrations, deleteCache, cacheKeys, regs };
 }
 
 function setNative(native: boolean) {
@@ -29,10 +35,17 @@ function setNative(native: boolean) {
 
 describe("cleanupServiceWorkerInNative", () => {
   let apis: ReturnType<typeof installBrowserApis>;
+  let reloadSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     apis = installBrowserApis();
     setNative(false);
+    sessionStorage.clear();
+    reloadSpy = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...window.location, reload: reloadSpy },
+    });
   });
 
   afterEach(() => {
@@ -48,6 +61,7 @@ describe("cleanupServiceWorkerInNative", () => {
     await Promise.resolve();
     expect(apis.getRegistrations).not.toHaveBeenCalled();
     expect(apis.cacheKeys).not.toHaveBeenCalled();
+    expect(reloadSpy).not.toHaveBeenCalled();
   });
 
   it("原生 APP 中注销所有残留 Service Worker", async () => {
@@ -66,6 +80,44 @@ describe("cleanupServiceWorkerInNative", () => {
     await vi.waitFor(() => expect(apis.deleteCache).toHaveBeenCalled());
     expect(apis.deleteCache).toHaveBeenCalledWith("workbox-cache");
     expect(apis.deleteCache).toHaveBeenCalledWith("api-cache");
+  });
+
+  it("原生 APP 中页面被旧 SW 控制时，清理后 reload 一次以加载最新 bundle", async () => {
+    const controlled = installBrowserApis({ controlled: true });
+    setNative(true);
+    const { cleanupServiceWorkerInNative } = await import("../../src/native-sw-cleanup");
+    cleanupServiceWorkerInNative();
+    await vi.waitFor(() => expect(controlled.unregister).toHaveBeenCalled());
+    await vi.waitFor(() => expect(reloadSpy).toHaveBeenCalledTimes(1));
+  });
+
+  it("存在残留 SW 注册（即使未控制页面）时也 reload 一次", async () => {
+    const withReg = installBrowserApis({ controlled: false, registrations: 1 });
+    setNative(true);
+    const { cleanupServiceWorkerInNative } = await import("../../src/native-sw-cleanup");
+    cleanupServiceWorkerInNative();
+    await vi.waitFor(() => expect(withReg.unregister).toHaveBeenCalled());
+    await vi.waitFor(() => expect(reloadSpy).toHaveBeenCalledTimes(1));
+  });
+
+  it("没有任何 SW 时不 reload（避免每次启动都刷新）", async () => {
+    installBrowserApis({ controlled: false, registrations: 0 });
+    setNative(true);
+    const { cleanupServiceWorkerInNative } = await import("../../src/native-sw-cleanup");
+    cleanupServiceWorkerInNative();
+    // 等待内部 Promise 完成
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(reloadSpy).not.toHaveBeenCalled();
+  });
+
+  it("sessionStorage 已标记时不重复 reload（防止无限刷新）", async () => {
+    installBrowserApis({ controlled: true });
+    sessionStorage.setItem("sock-erp-sw-reloaded", "1");
+    setNative(true);
+    const { cleanupServiceWorkerInNative } = await import("../../src/native-sw-cleanup");
+    cleanupServiceWorkerInNative();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(reloadSpy).not.toHaveBeenCalled();
   });
 
   it("缺少 serviceWorker / caches API 时不报错", async () => {
