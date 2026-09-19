@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { buildApp } from "../../server/app.js";
 import { makeTestDirectory, removeTestDirectory } from "../helpers.js";
 
@@ -31,7 +33,13 @@ describe("static service worker cache headers", () => {
     directory = makeTestDirectory("sw-cache-assets");
     const app = await buildApp({ dataDir: directory, autoBackup: false, serveStatic: true });
     try {
-      const js = await app.inject({ method: "GET", url: "/assets/index-DjPUIWOk.js" });
+      // 动态发现一个真实存在的 hashed 资源，避免硬编码 hash 在重新构建后 404
+      const assetsDir = path.resolve("dist/assets");
+      const hashed = fs.existsSync(assetsDir)
+        ? fs.readdirSync(assetsDir).find((f) => /^index-.*\.js$/.test(f))
+        : undefined;
+      expect(hashed, "需要先构建前端（dist/assets 下存在 index-*.js）").toBeTruthy();
+      const js = await app.inject({ method: "GET", url: `/assets/${hashed}` });
       expect(js.statusCode).toBe(200);
       expect(js.headers["cache-control"]).toContain("max-age=31536000");
     } finally {

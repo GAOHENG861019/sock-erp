@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent, within } from "@testing-library/react";
-import { FitnessPage } from "../../src/pages/FitnessPage";
+import { render, screen, fireEvent, within, renderHook, act } from "@testing-library/react";
+import { FitnessPage, useRawMaterials } from "../../src/pages/FitnessPage";
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -119,5 +119,60 @@ describe("原材料采购", () => {
     fireEvent.change(nameInput, { target: { value: "棉纱2" } });
     fireEvent.click(within(modal).getByText("保存修改"));
     expect(screen.getByText("棉纱2")).toBeInTheDocument();
+  });
+
+  it("新增原材料时同步写入 localStorage（不依赖 effect 时序，杜绝云拉取竞态）", () => {
+    const { result } = renderHook(() => useRawMaterials());
+    act(() => {
+      result.current[1]((prev) => [
+        ...prev,
+        { id: "x1", name: "测试纱", spec: "32支", weight: 10, unitPrice: 5, amount: 50, packages: 1 },
+      ]);
+      // 关键：在 act 回调内（持久化 effect 尚未 flush）立即断言本地已落盘
+      const stored = JSON.parse(window.localStorage.getItem("sock-erp-raw-materials") || "[]");
+      expect(stored.some((i: any) => i.id === "x1")).toBe(true);
+    });
+  });
+
+  it("云拉取事件携带落后数据时，本地刚新增的原材料不被覆盖", () => {
+    const { result } = renderHook(() => useRawMaterials());
+    // 本地新增一条
+    act(() => {
+      result.current[1]((prev) => [
+        ...prev,
+        { id: "local-new", name: "本地新料", spec: "40支", weight: 10, unitPrice: 5, amount: 50, packages: 1 },
+      ]);
+    });
+    // 模拟手机冷启动云拉取在窗口期到达：localStorage 被写成落后的云端数组（不含本地新项）
+    window.localStorage.setItem(
+      "sock-erp-raw-materials",
+      JSON.stringify([{ id: "cloud-old", name: "云端旧料", spec: "21支", weight: 20, unitPrice: 4, amount: 80, packages: 1 }]),
+    );
+    act(() => {
+      window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key: "sock-erp-raw-materials", type: "pull" } }));
+    });
+    // 本地新项必须保留，云端项也合并进来
+    const ids = result.current[0].map((i) => i.id);
+    expect(ids).toContain("local-new");
+    expect(ids).toContain("cloud-old");
+  });
+
+  it("删除原材料后云事件到达不会把已删除项恢复", () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "keep", name: "保留料", spec: "32支", weight: 1, unitPrice: 1, amount: 1, packages: 1 },
+      { id: "gone", name: "待删料", spec: "32支", weight: 1, unitPrice: 1, amount: 1, packages: 1 },
+    ]));
+    const { result } = renderHook(() => useRawMaterials());
+    act(() => {
+      result.current[1]((prev) => prev.filter((i) => i.id !== "gone"));
+    });
+    // 删除已同步落盘：localStorage 也不含 gone
+    const storedIds = JSON.parse(window.localStorage.getItem("sock-erp-raw-materials") || "[]").map((i: any) => i.id);
+    expect(storedIds).not.toContain("gone");
+    // 云事件携带与本地一致的数据，不应恢复 gone
+    act(() => {
+      window.dispatchEvent(new CustomEvent("cloud-storage-sync", { detail: { key: "sock-erp-raw-materials", type: "pull" } }));
+    });
+    expect(result.current[0].map((i) => i.id)).not.toContain("gone");
   });
 });

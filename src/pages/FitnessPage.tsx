@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash, Calculator, Plus, Pencil } from "@phosphor-icons/react";
 import { Button, EmptyState, Modal, PageHeader, Section } from "../components/ui";
 import { ModuleArtwork } from "../components/ModuleArtwork";
@@ -17,12 +17,34 @@ function readRawMaterials(): RawMaterial[] {
   }
 }
 
-function useRawMaterials() {
-  const [items, setItems] = useState<RawMaterial[]>(readRawMaterials);
+export function useRawMaterials() {
+  const [items, setItemsState] = useState<RawMaterial[]>(readRawMaterials);
+  // 始终保存最新的 items，使 setItems 能在 React 重渲染前同步计算并落盘
+  const itemsRef = useRef<RawMaterial[]>(items);
 
-  // 持久化：仅当本地存储与当前状态不同时才写入。云端拉取/实时推送会先把数据写入
-  // 本地，再经事件同步到状态；相同则跳过，避免把同一份云端数据回写并多上传一次。
+  const setItems = useCallback(
+    (updater: RawMaterial[] | ((prev: RawMaterial[]) => RawMaterial[])) => {
+      const prev = itemsRef.current;
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      itemsRef.current = next;
+      // 同步落盘：消除「React state 已更新但持久化 effect 尚未执行」的竞态窗口。
+      // 否则手机冷启动时云拉取/实时推送在该窗口到达，会读取到不含新项的旧 localStorage
+      // 并经事件覆盖 state，表现为「保存并继续后原材料添加不进」。
+      try {
+        const nextStr = JSON.stringify(next);
+        if (localStorage.getItem(RAW_MATERIALS_KEY) !== nextStr) {
+          localStorage.setItem(RAW_MATERIALS_KEY, nextStr);
+        }
+      } catch { /* ignore */ }
+      setItemsState(next);
+    },
+    [],
+  );
+
+  // 持久化兜底：云事件把数据写入本地后，effect 保证 state 与本地一致；相同则跳过，
+  // 避免把同一份云端数据回写并多上传一次。
   useEffect(() => {
+    itemsRef.current = items;
     try {
       const next = JSON.stringify(items);
       if (localStorage.getItem(RAW_MATERIALS_KEY) !== next) {
@@ -38,7 +60,17 @@ function useRawMaterials() {
       const detail = (e as CustomEvent).detail as { key?: string } | undefined;
       if (detail?.key && detail.key !== RAW_MATERIALS_KEY) return;
       const latest = readRawMaterials();
-      setItems((prev) => (JSON.stringify(prev) === JSON.stringify(latest) ? prev : latest));
+      setItemsState((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(latest)) return prev;
+        // 按 id 并集：保留当前 state 中存在但本地快照暂缺的条目（窗口期内本地刚新增、
+        // 尚未被云拉取读到的项），同时接纳云端新到的条目。删除已同步落盘，不会被误恢复。
+        const latestIds = new Set(latest.map((i) => i.id));
+        const localOnly = prev.filter((i) => !latestIds.has(i.id));
+        if (localOnly.length === 0) return latest;
+        const prevIds = new Set(prev.map((i) => i.id));
+        const cloudOnly = latest.filter((i) => !prevIds.has(i.id));
+        return [...prev, ...cloudOnly];
+      });
     };
     window.addEventListener("cloud-storage-sync", handler);
     window.addEventListener("cloud-storage-local", handler);

@@ -142,7 +142,7 @@ export function AppLayout() {
 
   // 启动时自动检测更新
   useEffect(() => {
-    const currentVersion = "1.4.1";
+    const currentVersion = "1.4.2";
     const dismissed = localStorage.getItem("sock-erp-update-dismissed");
     if (dismissed === currentVersion) return;
     (async () => {
