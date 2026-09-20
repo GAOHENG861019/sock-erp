@@ -65,6 +65,29 @@ export function compareVersions(a: string, b: string): number {
 }
 
 /** 是否运行在 Capacitor 原生壳（手机 APK）内 */
+/**
+ * 是否应弹「发现新版本」整包更新提醒。
+ *
+ * 之前 Layout 的整包更新弹窗把当前版本硬编码成旧版本号（如 1.4.2），
+ * 导致云端即使已是最新版也恒判定“有新版本”，每次启动都弹窗；
+ * 且“稍后再说”存的是云端版本，判断时却与旧本地版本比较，永远不生效。
+ * 统一规则：
+ *  - 云端版本不高于当前版本 → 已是最新，不提醒；
+ *  - 云端有更高版本，但用户已对该版本点过“稍后再说” → 不提醒；
+ *  - 其余情况 → 提醒。
+ */
+export function shouldPromptUpdate(options: {
+  currentVersion: string;
+  latestVersion: string | null | undefined;
+  dismissedVersion?: string | null;
+}): boolean {
+  const { currentVersion, latestVersion, dismissedVersion } = options;
+  if (!latestVersion) return false;
+  if (compareVersions(latestVersion, currentVersion) <= 0) return false;
+  if (dismissedVersion && dismissedVersion === latestVersion) return false;
+  return true;
+}
+
 export function isNativeApp(): boolean {
   try {
     return Capacitor.isNativePlatform();

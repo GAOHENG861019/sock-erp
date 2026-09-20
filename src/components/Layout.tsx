@@ -15,6 +15,8 @@ import { AmbientEnvironment, chooseAmbientScene } from "./AmbientEnvironment";
 import { ModuleArtwork, type ModuleArtworkName } from "./ModuleArtwork";
 import type { Entity } from "../types";
 import { AppUpdate, isNativeApp } from "../plugins/AppUpdate";
+import { shouldPromptUpdate } from "../app-update";
+import { APP_VERSION } from "../version";
 import { setupNativeBackButton } from "../native-back";
 import { PullToRefresh } from "./PullToRefresh";
 
@@ -178,9 +180,7 @@ export function AppLayout() {
 
   // 启动时自动检测更新
   useEffect(() => {
-    const currentVersion = "1.4.2";
     const dismissed = localStorage.getItem("sock-erp-update-dismissed");
-    if (dismissed === currentVersion) return;
     (async () => {
       let info = null;
       // 优先从Supabase获取
@@ -207,7 +207,7 @@ export function AppLayout() {
           } catch { /* try next */ }
         }
       }
-      if (info && info.version > currentVersion) setUpdateInfo(info);
+      if (shouldPromptUpdate({ currentVersion: APP_VERSION, latestVersion: info?.version, dismissedVersion: dismissed })) setUpdateInfo(info);
     })();
   }, []);
 
