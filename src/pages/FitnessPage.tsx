@@ -7,6 +7,41 @@ type RawMaterial = { id: string; name: string; spec: string; weight: number; uni
 
 const RAW_MATERIALS_KEY = "sock-erp-raw-materials";
 
+// 连续录入时跨条目记住的字段（规格/采购人/单重/单价），名称与包数每条不同不记忆
+const RAW_MATERIAL_LAST_KEY = "sock-erp-raw-material-last";
+type StickyRawMaterialValues = Pick<RawMaterial, "spec" | "weight" | "unitPrice" | "payer">;
+
+/** 读取上次录入记住的规格/采购人/单重/单价，作为新增对话框默认值 */
+function readStickyDefaults(): StickyRawMaterialValues {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RAW_MATERIAL_LAST_KEY) || "null");
+    if (parsed && typeof parsed === "object") {
+      return {
+        spec: typeof parsed.spec === "string" ? parsed.spec : "",
+        payer: typeof parsed.payer === "string" ? parsed.payer : "",
+        weight: Number(parsed.weight) || 0,
+        unitPrice: Number(parsed.unitPrice) || 0,
+      };
+    }
+  } catch { /* ignore */ }
+  return { spec: "", weight: 0, unitPrice: 0, payer: "" };
+}
+
+/** 新增成功后记住本次的规格/采购人/单重/单价，供下一条默认填充 */
+function rememberStickyValues(item: RawMaterial): StickyRawMaterialValues {
+  const sticky: StickyRawMaterialValues = {
+    spec: item.spec || "",
+    payer: item.payer || "",
+    weight: Number(item.weight) || 0,
+    unitPrice: Number(item.unitPrice) || 0,
+  };
+  try {
+    localStorage.setItem(RAW_MATERIAL_LAST_KEY, JSON.stringify(sticky));
+  } catch { /* ignore */ }
+  return sticky;
+}
+
+
 function readRawMaterials(): RawMaterial[] {
   try {
     const raw = localStorage.getItem(RAW_MATERIALS_KEY);
@@ -92,7 +127,7 @@ export function FitnessPage() {
 
   return (
     <div>
-      <PageHeader icon={<ModuleArtwork module="fitness" />} eyebrow="采购与供应商" title="原材料采购" description="记录原材料采购明细，总重量=包数×单重，金额=包数×单重×单价。" actions={<Button onClick={() => setRawDialog({ id: "", name: "", spec: "", weight: 0, unitPrice: 0, amount: 0, packages: 0 })}><Plus size={17} />添加原材料</Button>} />
+      <PageHeader icon={<ModuleArtwork module="fitness" />} eyebrow="采购与供应商" title="原材料采购" description="记录原材料采购明细，总重量=包数×单重，金额=包数×单重×单价。" actions={<Button onClick={() => setRawDialog({ id: "", name: "", packages: 0, amount: 0, ...readStickyDefaults() })}><Plus size={17} />添加原材料</Button>} />
       <div className="overview-strip" style={{ marginBottom: 16 }}>
         <div><span>原材料种类</span><strong>{rawMaterials.length}</strong></div>
         <div><span>总重量</span><strong>{rawWeight.toFixed(2)}<small> 公斤</small></strong></div>
@@ -100,7 +135,7 @@ export function FitnessPage() {
         <div><span>采购总额</span><strong>¥{rawTotal.toFixed(2)}</strong></div>
       </div>
       <Section title="原材料清单" description="添加名称、规格、包数、单重(公斤/包)和单价(元/公斤)，总重量和金额自动计算，可上传照片">
-        {rawMaterials.length ? <><table className="prod-table"><thead><tr><th>照片</th><th>名称</th><th>规格</th><th>采购人</th><th>包数</th><th>单重(公斤)</th><th>总重量(公斤)</th><th>单价(元/公斤)</th><th>金额</th><th>操作</th></tr></thead><tbody>{rawMaterials.map((item) => { const totalW = Number(item.packages || 0) * Number(item.weight || 0); return <tr key={item.id}><td>{item.photo ? <img src={item.photo} alt={item.name} style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6 }} /> : <span style={{ color: "#999", fontSize: 12 }}>无</span>}</td><td>{item.name}</td><td>{item.spec || "-"}</td><td>{item.payer || "-"}</td><td>{item.packages || 0} 包</td><td>{item.weight} 公斤</td><td>{totalW.toFixed(2)} 公斤</td><td>¥{Number(item.unitPrice || 0).toFixed(2)}/公斤</td><td>¥{Number(item.amount).toFixed(2)}</td><td><button className="icon-button" title="编辑" onClick={() => setRawDialog(item)}><Pencil size={16} /></button><button className="icon-button danger-text" title="删除" onClick={() => setRawMaterials((prev) => prev.filter((r) => r.id !== item.id))}><Trash size={16} /></button></td></tr>; })}</tbody></table><div className="prod-summary prod-grand"><span><Calculator size={18} />原材料总额度：<strong>¥{rawTotal.toFixed(2)}</strong></span></div></> : <EmptyState title="还没有原材料" description="点击添加原材料，记录名称、规格、重量和单价。" action={<Button variant="secondary" onClick={() => setRawDialog({ id: "", name: "", spec: "", weight: 0, unitPrice: 0, amount: 0, packages: 0 })}>添加第一个原材料</Button>} />}
+        {rawMaterials.length ? <><table className="prod-table"><thead><tr><th>照片</th><th>名称</th><th>规格</th><th>采购人</th><th>包数</th><th>单重(公斤)</th><th>总重量(公斤)</th><th>单价(元/公斤)</th><th>金额</th><th>操作</th></tr></thead><tbody>{rawMaterials.map((item) => { const totalW = Number(item.packages || 0) * Number(item.weight || 0); return <tr key={item.id}><td>{item.photo ? <img src={item.photo} alt={item.name} style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6 }} /> : <span style={{ color: "#999", fontSize: 12 }}>无</span>}</td><td>{item.name}</td><td>{item.spec || "-"}</td><td>{item.payer || "-"}</td><td>{item.packages || 0} 包</td><td>{item.weight} 公斤</td><td>{totalW.toFixed(2)} 公斤</td><td>¥{Number(item.unitPrice || 0).toFixed(2)}/公斤</td><td>¥{Number(item.amount).toFixed(2)}</td><td><button className="icon-button" title="编辑" onClick={() => setRawDialog(item)}><Pencil size={16} /></button><button className="icon-button danger-text" title="删除" onClick={() => setRawMaterials((prev) => prev.filter((r) => r.id !== item.id))}><Trash size={16} /></button></td></tr>; })}</tbody></table><div className="prod-summary prod-grand"><span><Calculator size={18} />原材料总额度：<strong>¥{rawTotal.toFixed(2)}</strong></span></div></> : <EmptyState title="还没有原材料" description="点击添加原材料，记录名称、规格、重量和单价。" action={<Button variant="secondary" onClick={() => setRawDialog({ id: "", name: "", packages: 0, amount: 0, ...readStickyDefaults() })}>添加第一个原材料</Button>} />}
       </Section>
       <RawMaterialDialog open={rawDialog} onClose={() => setRawDialog(null)} onSave={(item) => { setRawMaterials((prev) => item.id ? prev.map((r) => r.id === item.id ? item : r) : [...prev, { ...item, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }]); }} />
     </div>
@@ -136,12 +171,15 @@ function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null
       nameInputRef.current?.focus();
       return;
     }
-    onSave({ ...form, name });
+    const saved = { ...form, name };
+    onSave(saved);
     setNameError("");
     if (isEditing) {
       onClose();
     } else {
-      setForm({ id: "", name: "", spec: "", weight: 0, unitPrice: 0, amount: 0, packages: 0, payer: "" });
+      // 记住规格/采购人/单重/单价，只清空名称与包数，下一条无需重复填写
+      const sticky = rememberStickyValues(saved);
+      setForm({ id: "", name: "", packages: 0, amount: 0, ...sticky });
       setTimeout(() => nameInputRef.current?.focus(), 50);
     }
   };

@@ -201,4 +201,47 @@ describe("原材料采购", () => {
     const stored = JSON.parse(window.localStorage.getItem("sock-erp-raw-materials") || "[]");
     expect(stored.some((i: any) => i.name === "棉纱IME")).toBe(true);
   });
+
+  it("保存并继续后默认保留规格/采购人/单重/单价，仅清空名称与包数", () => {
+    render(<FitnessPage />);
+    fireEvent.click(screen.getByText("添加原材料"));
+    let modal = screen.getByRole("dialog");
+    fireEvent.change(within(modal).getByPlaceholderText("例如：棉纱、橡筋"), { target: { value: "棉纱黑色" } });
+    fireEvent.change(within(modal).getByPlaceholderText("例如：32支、40支"), { target: { value: "21支" } });
+    fireEvent.change(within(modal).getByPlaceholderText("谁采购的"), { target: { value: "张三" } });
+    fireEvent.change(within(modal).getByPlaceholderText("包"), { target: { value: "4" } });
+    fireEvent.change(within(modal).getByPlaceholderText("公斤"), { target: { value: "25" } });
+    fireEvent.change(within(modal).getByPlaceholderText("元/公斤"), { target: { value: "10" } });
+    fireEvent.click(within(modal).getByText("保存并继续"));
+
+    // 弹窗仍在（连续录入）：重复字段保留，名称与包数清空
+    modal = screen.getByRole("dialog");
+    expect((within(modal).getByPlaceholderText("例如：棉纱、橡筋") as HTMLInputElement).value).toBe("");
+    expect((within(modal).getByPlaceholderText("包") as HTMLInputElement).value).toBe("");
+    expect((within(modal).getByPlaceholderText("例如：32支、40支") as HTMLInputElement).value).toBe("21支");
+    expect((within(modal).getByPlaceholderText("谁采购的") as HTMLInputElement).value).toBe("张三");
+    expect((within(modal).getByPlaceholderText("公斤") as HTMLInputElement).value).toBe("25");
+    expect((within(modal).getByPlaceholderText("元/公斤") as HTMLInputElement).value).toBe("10");
+
+    // 记忆已落盘
+    const remembered = JSON.parse(window.localStorage.getItem("sock-erp-raw-material-last") || "null");
+    expect(remembered).toMatchObject({ spec: "21支", payer: "张三", weight: 25, unitPrice: 10 });
+  });
+
+  it("重新打开/重新挂载后新增对话框仍带出上次输入的默认值", () => {
+    window.localStorage.setItem(
+      "sock-erp-raw-material-last",
+      JSON.stringify({ spec: "32支", payer: "李四", weight: 30, unitPrice: 12 }),
+    );
+    render(<FitnessPage />);
+    fireEvent.click(screen.getByText("添加原材料"));
+    const modal = screen.getByRole("dialog");
+    expect((within(modal).getByPlaceholderText("例如：32支、40支") as HTMLInputElement).value).toBe("32支");
+    expect((within(modal).getByPlaceholderText("谁采购的") as HTMLInputElement).value).toBe("李四");
+    expect((within(modal).getByPlaceholderText("公斤") as HTMLInputElement).value).toBe("30");
+    expect((within(modal).getByPlaceholderText("元/公斤") as HTMLInputElement).value).toBe("12");
+    // 名称、包数仍为空
+    expect((within(modal).getByPlaceholderText("例如：棉纱、橡筋") as HTMLInputElement).value).toBe("");
+    expect((within(modal).getByPlaceholderText("包") as HTMLInputElement).value).toBe("");
+  });
 });
