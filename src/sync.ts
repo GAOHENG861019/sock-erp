@@ -44,6 +44,47 @@ const SYNC_META_KEY = "sock-erp-sync-meta";
 
 type SyncMeta = Record<string, string>;
 
+/**
+ * 持久化「待上传写入 / 删除」的队列。
+ * 关键修复：上传做了 1.5s 防抖，定时器只存在内存里；用户在防抖窗口内刷新 / 关闭页面，
+ * 待上传的变更（尤其删除）会丢失，而启动时的 pullFromCloud 只读不写，
+ * 导致删除只停留在本地、云端仍保留被删条目，换设备 / 再次刷新后条目「复活」。
+ * 把待上传的 key 持久化到 localStorage，启动时据此补传。
+ */
+const PENDING_QUEUE_KEY = "sock-erp-sync-pending";
+type PendingOp = "put" | "del";
+let pendingQueue: Record<string, PendingOp> = loadPendingQueue();
+
+function loadPendingQueue(): Record<string, PendingOp> {
+  try {
+    const raw = originalLocalStorage.getItem(PENDING_QUEUE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, PendingOp>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function savePendingQueue(): void {
+  try {
+    originalLocalStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(pendingQueue));
+  } catch {
+    /* 忽略存储异常 */
+  }
+}
+
+function markPending(key: string, op: PendingOp): void {
+  // 同一 key 的最新操作覆盖旧操作（删除与新增以最后一次为准）
+  pendingQueue[key] = op;
+  savePendingQueue();
+}
+
+function clearPending(key: string, op: PendingOp): void {
+  if (pendingQueue[key] === op) {
+    delete pendingQueue[key];
+    savePendingQueue();
+  }
+}
+
 /** 读取同步时间戳 meta（meta 本身是对象，不会被污染） */
 function getSyncMeta(): SyncMeta {
   try {
@@ -323,7 +364,8 @@ function shouldSync(key: string): boolean {
   return (
     key.startsWith(SYNC_PREFIX) &&
     key !== "sock-erp-device-id" &&
-    key !== SYNC_META_KEY
+    key !== SYNC_META_KEY &&
+    key !== PENDING_QUEUE_KEY
   );
 }
 
@@ -345,6 +387,9 @@ function queueCloudWrite(key: string, value: string) {
   if (!SUPABASE_CONFIG.enabled) return;
   if (!shouldSync(key)) return;
 
+  // 立即持久化待上传标记，防抖窗口内刷新 / 关闭也不会丢，启动时补传
+  markPending(key, "put");
+
   const existing = pendingWrites.get(key);
   if (existing) clearTimeout(existing.timer);
 
@@ -361,6 +406,7 @@ function queueCloudDelete(key: string) {
   if (!SUPABASE_CONFIG.enabled) return;
   if (!shouldSync(key)) return;
 
+  markPending(key, "del");
   pendingDeletes.add(key);
   setTimeout(() => {
     if (pendingDeletes.has(key)) {
@@ -427,6 +473,7 @@ async function upsertToCloud(key: string, value: string) {
       const bizUpdatedAt = await upsertRow(key, mergedArr);
       await upsertRow(ENTRIES_META_KEY, entriesMeta);
       metaDirty = false;
+      clearPending(key, "put");
 
       const meta = getSyncMeta();
       meta[key] = bizUpdatedAt;
@@ -438,6 +485,7 @@ async function upsertToCloud(key: string, value: string) {
 
     // 对象类：整份 last-write-wins
     const updatedAt = await upsertRow(key, parsed);
+    clearPending(key, "put");
     const meta = getSyncMeta();
     meta[key] = updatedAt;
     setSyncMeta(meta);
@@ -458,6 +506,7 @@ async function deleteFromCloud(key: string) {
     setStatus("syncing");
     const { error } = await supabase.from("app_data").delete().eq("storage_key", key);
     if (error) throw error;
+    clearPending(key, "del");
     setStatus("idle");
   } catch (error) {
     console.error("[CloudSync] 删除失败:", error);
@@ -480,6 +529,8 @@ async function pullFromCloud(): Promise<number> {
     let merged = 0;
     let uiPrefsChanged = false;
     const changedKeys: string[] = [];
+    // 记录「本地领先云端」的条目数组 key（本地删除/新增尚未到达云端），拉取后回写收敛
+    const pushBackKeys = new Set<string>();
     const records = (data as CloudRecord[]) || [];
     const meta = getSyncMeta();
 
@@ -530,6 +581,23 @@ async function pullFromCloud(): Promise<number> {
         saveEntriesMetaLocally();
         const mergedValue = JSON.stringify(mergedArr);
         itemSnapshots.set(key, mergedValue);
+        // 检测本地是否领先云端：云端有但合并后被墓碑剔除（本地删除），或本地有云端无（本地新增）。
+        // 这类差异若不回写，一旦本地变更在防抖窗口内丢失，刷新 / 换设备后被删条目就会复活。
+        const mergedIds = new Set(mergedArr.map((i) => String(i.id)));
+        for (const cloudItem of cloudArr) {
+          if (!mergedIds.has(String(cloudItem.id))) {
+            pushBackKeys.add(key);
+            break;
+          }
+        }
+        if (!pushBackKeys.has(key)) {
+          for (const mergedItem of mergedArr) {
+            if (!cloudArr.some((c) => String(c.id) === String(mergedItem.id))) {
+              pushBackKeys.add(key);
+              break;
+            }
+          }
+        }
         if (localRaw !== mergedValue) {
           originalLocalStorage.setItem(key, mergedValue);
           meta[key] = record.updated_at;
@@ -554,6 +622,8 @@ async function pullFromCloud(): Promise<number> {
     }
 
     setSyncMeta(meta);
+    // 把本地领先云端的条目变更（含删除墓碑）回写云端，防止防抖窗口内丢失的删除在刷新 / 换设备后复活
+    await pushBackLocalItemChanges(pushBackKeys);
     if (uiPrefsChanged) emitUiPreferencesChanged();
     // 冷启动时组件可能先于云拉取挂载、读到空数据。对每个写入的 key 派发事件，
     // 让对应组件把状态更新为云端数据，避免随后新增时基于过时空状态覆盖云端记录。
@@ -566,6 +636,37 @@ async function pullFromCloud(): Promise<number> {
     console.error("[CloudSync] 拉取失败:", error);
     setStatus("offline");
     return 0;
+  }
+}
+
+/**
+ * 拉取合并后，把本地领先云端的条目数组（含删除墓碑）回写云端。
+ * 入参中的数组在本地已是「本地 + 云端」合并全集（已按墓碑过滤），直接 upsert 不会覆盖
+ * 其他设备的条目；同时把最新条目元数据（含墓碑）一并上传，删除才能传播到其他设备。
+ * 这是「删除后在防抖窗口内刷新、待上传丢失」的兜底收敛路径。
+ */
+async function pushBackLocalItemChanges(keys: Set<string>): Promise<void> {
+  if (keys.size === 0) return;
+  try {
+    for (const key of keys) {
+      const parsed = safeParse(originalLocalStorage.getItem(key));
+      if (!Array.isArray(parsed)) continue;
+      const ts = await upsertRow(key, parsed);
+      clearPending(key, "put");
+      const m = getSyncMeta();
+      m[key] = ts;
+      setSyncMeta(m);
+    }
+    // 墓碑 / rev 必须随业务数据一起上传，其他设备才能收到删除
+    await upsertRow(ENTRIES_META_KEY, entriesMeta);
+    metaDirty = false;
+    const m = getSyncMeta();
+    m[ENTRIES_META_KEY] = new Date().toISOString();
+    setSyncMeta(m);
+  } catch (error) {
+    console.error("[CloudSync] 本地领先变更回写失败:", error);
+    // 回写失败不阻塞启动；保留待重试标记，下次定时上传 / forceSync 会收敛
+    metaDirty = true;
   }
 }
 
@@ -638,6 +739,38 @@ function subscribeRealtime() {
     .subscribe();
 }
 
+/**
+ * 启动时补传防抖窗口内丢失的本地写入 / 删除。
+ * 待上传队列持久化在 localStorage（PENDING_QUEUE_KEY），即使上次在 1.5s 防抖内
+ * 刷新 / 关闭页面、定时器被销毁，这次启动也能把本地最新值（含删除墓碑）同步到云端。
+ * 条目数组的删除 / 新增已由 pullFromCloud 的回写兜底，这里再幂等补传一次，
+ * 同时覆盖对象类（设置、菜单配置）与整份删除。
+ */
+async function flushPendingQueueOnStartup(): Promise<void> {
+  const entries = Object.entries(pendingQueue);
+  if (entries.length === 0) return;
+  for (const [key, op] of entries) {
+    if (!shouldSync(key)) {
+      clearPending(key, op);
+      continue;
+    }
+    if (op === "del") {
+      await deleteFromCloud(key);
+      // pull 可能已把云端旧值恢复到本地；删除意图下保持本地与云端一致
+      originalLocalStorage.removeItem(key);
+      itemSnapshots.delete(key);
+      knownItemKeys.delete(key);
+      continue;
+    }
+    const latest = originalLocalStorage.getItem(key);
+    if (latest === null) {
+      await deleteFromCloud(key);
+    } else {
+      await upsertToCloud(key, latest);
+    }
+  }
+}
+
 /** 云存储包装器 - 替代直接使用localStorage */
 export const cloudStorage = {
   getItem(key: string): string | null {
@@ -683,6 +816,8 @@ export const cloudStorage = {
     // 云端拉取后再修复一次，确保新数据正常
     repairAllLocal();
     subscribeRealtime();
+    // 补传上次在防抖窗口内刷新 / 关闭而丢失的本地写入、删除（含删除墓碑）
+    await flushPendingQueueOnStartup();
 
     // 监听网络状态
     window.addEventListener("online", () => {
@@ -701,8 +836,10 @@ export const cloudStorage = {
 
   /** 强制全量同步：先拉取合并，再把本地最新值写回，最后再拉取一次收敛 */
   async forceSync(): Promise<void> {
-    // 1) 先把云端最新合并进本地
+    // 1) 先把云端最新合并进本地（pull 内部会回写本地领先的条目变更）
     await pullFromCloud();
+    // 1.5) 补传防抖窗口内丢失的本地写入 / 删除（含对象类设置与整份删除）
+    await flushPendingQueueOnStartup();
     // 2) flush 待写入（用本地最新值，内部会再读云端合并，杜绝覆盖）
     for (const [key, { timer }] of pendingWrites) {
       clearTimeout(timer);
