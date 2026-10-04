@@ -244,4 +244,75 @@ describe("原材料采购", () => {
     expect((within(modal).getByPlaceholderText("例如：棉纱、橡筋") as HTMLInputElement).value).toBe("");
     expect((within(modal).getByPlaceholderText("包") as HTMLInputElement).value).toBe("");
   });
+
+  it("材料档案：保存后按名称记住单重，连续录入再输同名自动带出", () => {
+    render(<FitnessPage />);
+    fireEvent.click(screen.getByText("添加原材料"));
+    let modal = screen.getByRole("dialog");
+    // 录入「包纱」，单重 32、单价 11
+    fireEvent.change(within(modal).getByPlaceholderText("例如：棉纱、橡筋"), { target: { value: "包纱" } });
+    fireEvent.change(within(modal).getByPlaceholderText("公斤"), { target: { value: "32" } });
+    fireEvent.change(within(modal).getByPlaceholderText("元/公斤"), { target: { value: "11" } });
+    fireEvent.click(within(modal).getByText("保存并继续"));
+
+    // 档案已落盘
+    const profiles = JSON.parse(window.localStorage.getItem("sock-erp-raw-material-profiles") || "{}");
+    expect(profiles["包纱"]).toMatchObject({ weight: 32, unitPrice: 11 });
+
+    // 连续录入下一条：名称再输「包纱」，单重/单价自动带出，无需重填
+    modal = screen.getByRole("dialog");
+    fireEvent.change(within(modal).getByPlaceholderText("例如：棉纱、橡筋"), { target: { value: "包纱" } });
+    expect((within(modal).getByPlaceholderText("公斤") as HTMLInputElement).value).toBe("32");
+    expect((within(modal).getByPlaceholderText("元/公斤") as HTMLInputElement).value).toBe("11");
+  });
+
+  it("包纱/橡筋/扎口各自记住不同单重，输入对应名称分别带出", () => {
+    window.localStorage.setItem("sock-erp-raw-material-profiles", JSON.stringify({
+      "包纱": { spec: "2075", payer: "", weight: 32, unitPrice: 11 },
+      "橡筋": { spec: "宽", payer: "", weight: 2, unitPrice: 15 },
+      "扎口": { spec: "", payer: "", weight: 1, unitPrice: 20 },
+    }));
+    render(<FitnessPage />);
+    fireEvent.click(screen.getByText("添加原材料"));
+    const modal = screen.getByRole("dialog");
+    const nameInput = within(modal).getByPlaceholderText("例如：棉纱、橡筋");
+    fireEvent.change(nameInput, { target: { value: "橡筋" } });
+    expect((within(modal).getByPlaceholderText("公斤") as HTMLInputElement).value).toBe("2");
+    fireEvent.change(nameInput, { target: { value: "扎口" } });
+    expect((within(modal).getByPlaceholderText("公斤") as HTMLInputElement).value).toBe("1");
+    fireEvent.change(nameInput, { target: { value: "包纱" } });
+    expect((within(modal).getByPlaceholderText("公斤") as HTMLInputElement).value).toBe("32");
+  });
+
+  it("中文输入法合成结束后名称正确保留并带出该材料档案", () => {
+    window.localStorage.setItem("sock-erp-raw-material-profiles", JSON.stringify({
+      "棉纱": { spec: "21支", payer: "", weight: 25, unitPrice: 10 },
+    }));
+    render(<FitnessPage />);
+    fireEvent.click(screen.getByText("添加原材料"));
+    const modal = screen.getByRole("dialog");
+    const nameInput = within(modal).getByPlaceholderText("例如：棉纱、橡筋");
+    // 模拟手机中文 IME：合成开始 → 合成中输入 → 合成结束
+    fireEvent.compositionStart(nameInput);
+    fireEvent.change(nameInput, { target: { value: "棉纱" } });
+    fireEvent.compositionEnd(nameInput, { target: { value: "棉纱" } });
+    // 名称不丢失，且该材料的规格/单重自动带出
+    expect((nameInput as HTMLInputElement).value).toBe("棉纱");
+    expect((within(modal).getByPlaceholderText("公斤") as HTMLInputElement).value).toBe("25");
+    expect((within(modal).getByPlaceholderText("例如：32支、40支") as HTMLInputElement).value).toBe("21支");
+  });
+
+  it("名称框提供历史材料下拉（datalist），可直接选择不用手打", () => {
+    window.localStorage.setItem("sock-erp-raw-material-profiles", JSON.stringify({
+      "包纱": { spec: "", payer: "", weight: 32, unitPrice: 11 },
+      "橡筋": { spec: "", payer: "", weight: 2, unitPrice: 15 },
+    }));
+    render(<FitnessPage />);
+    fireEvent.click(screen.getByText("添加原材料"));
+    const list = document.getElementById("raw-material-names");
+    expect(list).not.toBeNull();
+    const values = Array.from((list as HTMLElement).querySelectorAll("option")).map((o) => o.getAttribute("value"));
+    expect(values).toContain("包纱");
+    expect(values).toContain("橡筋");
+  });
 });

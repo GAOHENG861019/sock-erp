@@ -41,6 +41,36 @@ function rememberStickyValues(item: RawMaterial): StickyRawMaterialValues {
   return sticky;
 }
 
+// 材料档案：按「名称」分别记住该材料的规格/采购人/单重/单价。
+// 不同材料（包纱/橡筋/扎口）每包重量不同，输入名称后自动带出，无需每次重填。
+const RAW_MATERIAL_PROFILES_KEY = "sock-erp-raw-material-profiles";
+type RawMaterialProfile = StickyRawMaterialValues;
+
+function readMaterialProfiles(): Record<string, RawMaterialProfile> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RAW_MATERIAL_PROFILES_KEY) || "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+  } catch { /* ignore */ }
+  return {};
+}
+
+/** 保存某名称对应的材料档案，返回最新档案集合 */
+function saveMaterialProfile(item: RawMaterial): Record<string, RawMaterialProfile> {
+  const profiles = readMaterialProfiles();
+  const key = (item.name || "").trim();
+  if (!key) return profiles;
+  profiles[key] = {
+    spec: item.spec || "",
+    payer: item.payer || "",
+    weight: Number(item.weight) || 0,
+    unitPrice: Number(item.unitPrice) || 0,
+  };
+  try {
+    localStorage.setItem(RAW_MATERIAL_PROFILES_KEY, JSON.stringify(profiles));
+  } catch { /* ignore */ }
+  return profiles;
+}
+
 
 function readRawMaterials(): RawMaterial[] {
   try {
@@ -145,8 +175,11 @@ export function FitnessPage() {
 function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null; onClose: () => void; onSave: (item: RawMaterial) => void }) {
   const [form, setForm] = useState<RawMaterial>({ id: "", name: "", spec: "", weight: 0, unitPrice: 0, amount: 0, packages: 0 });
   const [nameError, setNameError] = useState("");
+  const [profiles, setProfiles] = useState<Record<string, RawMaterialProfile>>(readMaterialProfiles);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (open) { setForm(open); setNameError(""); } }, [open]);
+  // 中文输入法（IME）合成期间不做档案匹配，合成结束再统一处理，避免名称丢失
+  const composingRef = useRef(false);
+  useEffect(() => { if (open) { setForm(open); setNameError(""); setProfiles(readMaterialProfiles()); } }, [open]);
   if (!open) return null;
   const isEditing = !!form.id;
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,6 +191,21 @@ function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null
   };
   const calcAmount = (packages: number, weight: number, unitPrice: number) => Number((packages * weight * unitPrice).toFixed(2));
   const totalWeight = Number(form.packages || 0) * Number(form.weight || 0);
+  /** 名称命中档案时，自动带出该材料的规格/采购人/单重/单价并重算金额 */
+  const applyProfile = (base: RawMaterial, name: string): RawMaterial => {
+    const key = name.trim();
+    const profile = key ? profiles[key] : undefined;
+    if (!profile) return { ...base, name };
+    return {
+      ...base,
+      name,
+      spec: profile.spec,
+      payer: profile.payer,
+      weight: profile.weight,
+      unitPrice: profile.unitPrice,
+      amount: calcAmount(Number(base.packages || 0), profile.weight, profile.unitPrice),
+    };
+  };
   const handleSave = () => {
     // 手机中文输入法 / captureInput 下受控值可能在提交瞬间未及时同步，兜底从输入框读取一次
     let name = form.name;
@@ -174,10 +222,13 @@ function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null
     const saved = { ...form, name };
     onSave(saved);
     setNameError("");
+    // 按名称更新材料档案：不同材料（包纱/橡筋/扎口）各自记住单重，下次输入名称自动带出
+    setProfiles(saveMaterialProfile(saved));
     if (isEditing) {
+      rememberStickyValues(saved);
       onClose();
     } else {
-      // 记住规格/采购人/单重/单价，只清空名称与包数，下一条无需重复填写
+      // 全局记住规格/采购人/单重/单价，只清空名称与包数，下一条无需重复填写
       const sticky = rememberStickyValues(saved);
       setForm({ id: "", name: "", packages: 0, amount: 0, ...sticky });
       setTimeout(() => nameInputRef.current?.focus(), 50);
@@ -186,7 +237,7 @@ function RawMaterialDialog({ open, onClose, onSave }: { open: RawMaterial | null
   return (
     <Modal open title={isEditing ? "编辑原材料" : "添加原材料"} description="填写名称、规格、包数、单重(公斤/包)和单价(元/公斤)，总重量=包数×单重，金额=包数×单重×单价。添加后可连续录入下一条。" onClose={onClose}>
       <div className="form-grid">
-        <label className="form-field"><span>名称<em>必填</em></span><input ref={nameInputRef} value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); if (nameError) setNameError(""); }} placeholder="例如：棉纱、橡筋" />{nameError ? <small style={{ color: "#e74c3c" }}>{nameError}</small> : null}</label>
+        <label className="form-field"><span>名称<em>必填</em></span><input ref={nameInputRef} list="raw-material-names" value={form.name} placeholder="例如：棉纱、橡筋" onChange={(e) => { const value = e.target.value; if (nameError) setNameError(""); setForm((prev) => (composingRef.current ? { ...prev, name: value } : applyProfile(prev, value))); }} onCompositionStart={() => { composingRef.current = true; }} onCompositionEnd={(e) => { composingRef.current = false; const value = (e.target as HTMLInputElement).value; setForm((prev) => applyProfile(prev, value)); }} /><datalist id="raw-material-names">{Object.keys(profiles).map((n) => <option key={n} value={n} />)}</datalist>{nameError ? <small style={{ color: "#e74c3c" }}>{nameError}</small> : null}</label>
         <label className="form-field"><span>规格</span><input value={form.spec} onChange={(e) => setForm({ ...form, spec: e.target.value })} placeholder="例如：32支、40支" /></label>
         <label className="form-field"><span>采购人</span><input value={form.payer || ""} onChange={(e) => setForm({ ...form, payer: e.target.value })} placeholder="谁采购的" /></label>
         <label className="form-field"><span>包数</span><input type="number" step="1" min="0" value={form.packages || ""} onChange={(e) => { const p = Number(e.target.value) || 0; setForm({ ...form, packages: p, amount: calcAmount(p, form.weight, form.unitPrice) }); }} placeholder="包" /></label>
