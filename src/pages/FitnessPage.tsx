@@ -47,11 +47,28 @@ const RAW_MATERIAL_PROFILES_KEY = "sock-erp-raw-material-profiles";
 type RawMaterialProfile = StickyRawMaterialValues;
 
 function readMaterialProfiles(): Record<string, RawMaterialProfile> {
+  let stored: Record<string, RawMaterialProfile> | null = null;
   try {
     const parsed = JSON.parse(localStorage.getItem(RAW_MATERIAL_PROFILES_KEY) || "{}");
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) stored = parsed;
   } catch { /* ignore */ }
-  return {};
+  if (stored && Object.keys(stored).length > 0) return stored;
+  // 首次升级时档案为空：从现有原材料列表回填，使历史材料（包纱/橡筋/扎口等）也能按名称带出
+  const seeded: Record<string, RawMaterialProfile> = { ...(stored || {}) };
+  for (const item of readRawMaterials()) {
+    const key = (item.name || "").trim();
+    if (!key || seeded[key]) continue;
+    seeded[key] = {
+      spec: item.spec || "",
+      payer: item.payer || "",
+      weight: Number(item.weight) || 0,
+      unitPrice: Number(item.unitPrice) || 0,
+    };
+  }
+  if (Object.keys(seeded).length > 0) {
+    try { localStorage.setItem(RAW_MATERIAL_PROFILES_KEY, JSON.stringify(seeded)); } catch { /* ignore */ }
+  }
+  return seeded;
 }
 
 /** 保存某名称对应的材料档案，返回最新档案集合 */

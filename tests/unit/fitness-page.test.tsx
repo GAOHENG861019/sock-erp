@@ -315,4 +315,21 @@ describe("原材料采购", () => {
     expect(values).toContain("包纱");
     expect(values).toContain("橡筋");
   });
+
+  it("首次升级档案为空时从现有原材料回填，输入历史材料名称自动带出", () => {
+    window.localStorage.setItem("sock-erp-raw-materials", JSON.stringify([
+      { id: "a", name: "包纱黑色", spec: "2075", payer: "", packages: 10, weight: 32, unitPrice: 11, amount: 3520 },
+      { id: "b", name: "橡筋黑色", spec: "100", payer: "", packages: 7, weight: 25, unitPrice: 1, amount: 175 },
+    ]));
+    render(<FitnessPage />);
+    fireEvent.click(screen.getByText("添加原材料"));
+    const modal = screen.getByRole("dialog");
+    fireEvent.change(within(modal).getByPlaceholderText("例如：棉纱、橡筋"), { target: { value: "包纱黑色" } });
+    expect((within(modal).getByPlaceholderText("例如：32支、40支") as HTMLInputElement).value).toBe("2075");
+    expect((within(modal).getByPlaceholderText("公斤") as HTMLInputElement).value).toBe("32");
+    expect((within(modal).getByPlaceholderText("元/公斤") as HTMLInputElement).value).toBe("11");
+    const profiles = JSON.parse(window.localStorage.getItem("sock-erp-raw-material-profiles") || "{}");
+    expect(profiles["包纱黑色"]).toMatchObject({ weight: 32 });
+    expect(profiles["橡筋黑色"]).toMatchObject({ weight: 25 });
+  });
 });
